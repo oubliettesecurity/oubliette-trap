@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oubliette-trap"
+version = "0.1.0"
+description = "AI Agent Deception Platform -- honeypots, fingerprinting, and intelligence for autonomous AI threats"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [
+    { name = "Oubliette Security" },
+]
+keywords = [
+    "ai", "security", "honeypot", "deception", "mcp", "agent",
+    "fingerprinting", "threat-intelligence", "llm", "red-team",
+]
+dependencies = [
+    "mcp>=1.20.0",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=1.0"]
+
+[project.scripts]
+oubliette = "oubliette.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
