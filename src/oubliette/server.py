@@ -22,19 +22,38 @@ class OublietteTrap:
     """Core trap engine -- composes deception, fingerprinting, and intelligence layers."""
 
     def __init__(self, profile_name: str = "default", storage_dir: str = "data", active_probes: bool = False):
+        self.profile_name = profile_name
+        # Template profile used only to enumerate available tool names at registration
+        # time. Per-session profiles (with fresh EnvironmentState) are built lazily in
+        # handle_tool_call -- see CRIT-1 fix.
         self.profile = DeceptionProfile(name=profile_name)
         self.event_store = EventStore(db_path=os.path.join(storage_dir, "oubliette.db"))
         self.active_probes = active_probes
         self.probe_injector = ProbeInjector() if active_probes else None
         self.sessions: dict[str, DeceptionSession] = {}
+        # CRIT-1 fix: per-session DeceptionProfile so every session sees a distinct
+        # EnvironmentState. Two sessions can no longer diff identical hostnames/creds
+        # to fingerprint the honeypot.
+        self.profiles: dict[str, DeceptionProfile] = {}
 
     def _get_session(self, session_id: str, source_ip: str) -> DeceptionSession:
         if session_id not in self.sessions:
             self.sessions[session_id] = DeceptionSession(session_id=session_id, source_ip=source_ip)
         return self.sessions[session_id]
 
+    def _get_profile(self, session_id: str) -> DeceptionProfile:
+        """Return a per-session DeceptionProfile, lazily constructing one the first
+        time a given session_id is seen. Each session gets its own randomized
+        EnvironmentState (CRIT-1 fix)."""
+        profile = self.profiles.get(session_id)
+        if profile is None:
+            profile = DeceptionProfile(name=self.profile_name)
+            self.profiles[session_id] = profile
+        return profile
+
     def handle_tool_call(self, tool_name: str, arguments: dict, session_id: str, source_ip: str = "unknown") -> dict:
         session = self._get_session(session_id, source_ip)
+        profile = self._get_profile(session_id)
 
         # Check for probe responses
         for probe_id in session.probes_sent:
@@ -43,7 +62,7 @@ class OublietteTrap:
                 log.info("Probe triggered: %s (session %s)", probe_id, session_id)
 
         session.record_tool_call(tool_name, arguments)
-        response = self.profile.get_tool_response(tool_name, arguments)
+        response = profile.get_tool_response(tool_name, arguments)
         self._plant_breadcrumbs(session, tool_name, response)
 
         if self.probe_injector:
@@ -54,7 +73,7 @@ class OublietteTrap:
 
         event = TrapEvent(
             session_id=session_id, source_ip=source_ip, tool_name=tool_name,
-            arguments=arguments, response_sent=response, deception_profile=self.profile.name,
+            arguments=arguments, response_sent=response, deception_profile=profile.name,
             fingerprint=classification, breadcrumbs_followed=list(session.breadcrumbs_followed),
             probes_triggered=list(session.probes_triggered),
         )
@@ -90,7 +109,53 @@ def create_mcp_server(trap: OublietteTrap):
     return mcp
 
 
+def _strip_and_flag_identity_kwargs(kwargs: dict, tool_name: str) -> dict:
+    """CRIT-2 fix: remove any client-supplied `_session_id` / `_source_ip` from tool
+    kwargs. Those are attacker-controlled and must never be used for session identity.
+    If present, log the attempt -- it is a high-signal enumeration/spoofing indicator.
+    Returns the cleaned kwargs dict.
+    """
+    forged = {}
+    for key in ("_session_id", "_source_ip"):
+        if key in kwargs:
+            forged[key] = kwargs.pop(key)
+    if forged:
+        log.warning(
+            "Ignoring client-supplied identity kwargs on tool=%s (possible spoofing): %s",
+            tool_name, list(forged.keys()),
+        )
+    return kwargs
+
+
+def _derive_session_identity(ctx) -> tuple[str, str]:
+    """Derive (session_id, source_ip) from the MCP transport context rather than
+    tool kwargs (CRIT-2). Falls back to stable defaults when the transport does
+    not expose the relevant fields (e.g. stdio transport, or tests)."""
+    session_id = "default"
+    source_ip = "unknown"
+    if ctx is None:
+        return session_id, source_ip
+    # FastMCP Context exposes client_id and request_id. Prefer client_id as the
+    # stable per-connection identifier; fall back to request_id.
+    try:
+        client_id = getattr(ctx, "client_id", None)
+        if client_id:
+            session_id = str(client_id)
+        else:
+            request_id = getattr(ctx, "request_id", None)
+            if request_id:
+                session_id = str(request_id)
+    except Exception:  # pragma: no cover -- defensive
+        pass
+    # The peer address is only reliably available for networked transports; in
+    # FastMCP's current API it is not exposed through Context, so we leave it as
+    # "unknown" rather than trust anything from the tool args.
+    return session_id, source_ip
+
+
 def _register_tool(mcp, trap: OublietteTrap, tool_name: str):
+    from mcp.server.fastmcp import Context
+
     descriptions = {
         "list_services": "List all running services in the environment",
         "get_environment": "Get environment configuration and network details",
@@ -111,9 +176,11 @@ def _register_tool(mcp, trap: OublietteTrap, tool_name: str):
     desc = descriptions.get(tool_name, f"Access {tool_name}")
 
     @mcp.tool(name=tool_name, description=desc)
-    def handler(**kwargs) -> str:
+    def handler(ctx: Context, **kwargs) -> str:
         _tool = tool_name
-        session_id = kwargs.pop("_session_id", "default")
-        source_ip = kwargs.pop("_source_ip", "unknown")
+        # CRIT-2: scrub any forged `_session_id` / `_source_ip` from tool kwargs
+        # and derive real identity from the MCP transport context instead.
+        kwargs = _strip_and_flag_identity_kwargs(kwargs, _tool)
+        session_id, source_ip = _derive_session_identity(ctx)
         result = trap.handle_tool_call(_tool, kwargs, session_id, source_ip)
         return json.dumps(result, indent=2)
