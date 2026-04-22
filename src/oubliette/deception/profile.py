@@ -45,7 +45,7 @@ class EnvironmentState:
             f"{p}-{s}.{domain}"
             for p, s in zip(
                 _pick(_HOSTNAME_PREFIXES, 8),
-                _pick(_HOSTNAME_SUFFIXES, 8),
+                _pick(_HOSTNAME_SUFFIXES, 8), strict=False,
             )
         ]
 

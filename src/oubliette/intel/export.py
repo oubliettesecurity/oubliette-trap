@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from oubliette.models import AgentProfile, TrapEvent
 
@@ -15,8 +15,8 @@ def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict:
     identity_id = "identity--oubliette-trap"
     objects.append({
         "type": "identity", "spec_version": "2.1", "id": identity_id,
-        "created": datetime.now(timezone.utc).isoformat() + "Z",
-        "modified": datetime.now(timezone.utc).isoformat() + "Z",
+        "created": datetime.now(UTC).isoformat() + "Z",
+        "modified": datetime.now(UTC).isoformat() + "Z",
         "name": "Oubliette Agent Deception Platform", "identity_class": "system",
     })
 
@@ -72,7 +72,7 @@ def export_json(events: list[TrapEvent], profiles: list[AgentProfile]) -> str:
     return json.dumps({
         "events": [e.to_dict() for e in events],
         "profiles": [p.to_dict() for p in profiles],
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
     }, indent=2)
 
 

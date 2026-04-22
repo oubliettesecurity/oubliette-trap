@@ -33,7 +33,7 @@ def inject_format_compliance(response: dict) -> tuple[dict, str]:
 
 
 def check_for_probe_response(probe_id: str, arguments: dict) -> bool:
-    probe_type, value = probe_id.split(":", 1)
+    _probe_type, value = probe_id.split(":", 1)
     args_str = str(arguments)
     return value in args_str
 

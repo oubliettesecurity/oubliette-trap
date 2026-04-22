@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Optional
 
 from oubliette.deception.profile import DeceptionProfile
 from oubliette.deception.session import DeceptionSession
@@ -66,7 +65,7 @@ class OublietteTrap:
         self._plant_breadcrumbs(session, tool_name, response)
 
         if self.probe_injector:
-            response, probe_ids = self.probe_injector.inject(response, session)
+            response, _probe_ids = self.probe_injector.inject(response, session)
 
         signals = compute_passive_signals(session)
         classification = classify_agent(signals, probes_triggered=len(session.probes_triggered), probes_sent=len(session.probes_sent))
@@ -80,7 +79,7 @@ class OublietteTrap:
         self.event_store.save(event)
         return response
 
-    def get_classification(self, session_id: str) -> Optional[AgentClassification]:
+    def get_classification(self, session_id: str) -> AgentClassification | None:
         session = self.sessions.get(session_id)
         if not session:
             return None

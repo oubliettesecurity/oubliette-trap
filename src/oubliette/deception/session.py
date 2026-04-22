@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _TOOL_CATEGORIES = {
     "list_services": "discovery", "get_environment": "discovery", "whoami": "discovery",
@@ -22,7 +22,7 @@ class DeceptionSession:
     """Tracks an agent's journey through the deception environment."""
     session_id: str
     source_ip: str
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     tools_called: list[str] = field(default_factory=list)
     call_timestamps: list[float] = field(default_factory=list)
     inter_call_timings_ms: list[float] = field(default_factory=list)

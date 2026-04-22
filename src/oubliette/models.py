@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -45,7 +45,7 @@ class TrapEvent:
     response_sent: dict
     deception_profile: str
     event_id: str = field(default_factory=lambda: f"EVT-{uuid.uuid4().hex[:8].upper()}")
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     fingerprint: AgentClassification = field(default_factory=AgentClassification)
     breadcrumbs_followed: list[str] = field(default_factory=list)
     probes_triggered: list[str] = field(default_factory=list)
@@ -74,7 +74,7 @@ class AgentProfile:
     behavioral_signature: str
     profile_id: str = field(default_factory=lambda: f"AGT-{uuid.uuid4().hex[:8].upper()}")
     classification: AgentClassification = field(default_factory=AgentClassification)
-    first_seen: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    first_seen: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     last_seen: str = ""
     session_count: int = 0
     tools_targeted: list[str] = field(default_factory=list)
@@ -88,7 +88,7 @@ class AgentProfile:
     ) -> None:
         """Update profile with data from a new session."""
         self.session_count += 1
-        self.last_seen = datetime.now(timezone.utc).isoformat()
+        self.last_seen = datetime.now(UTC).isoformat()
         self.classification = classification
         for tool in tools:
             if tool not in self.tools_targeted:
