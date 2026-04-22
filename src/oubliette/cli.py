@@ -7,8 +7,8 @@ import json
 import logging
 import sys
 
+from oubliette.intel.export import export_cef, export_json, export_stix
 from oubliette.server import OublietteTrap, create_mcp_server
-from oubliette.intel.export import export_stix, export_cef, export_json
 
 
 def main():
@@ -55,7 +55,7 @@ def _serve(args):
 
 def _export(args):
     from oubliette.intel.events import EventStore
-    from oubliette.models import TrapEvent, AgentClassification, AgentType
+    from oubliette.models import AgentClassification, AgentType, TrapEvent
 
     store = EventStore(db_path=f"{args.storage_dir}/oubliette.db")
     raw_events = store.get_all(limit=10000)

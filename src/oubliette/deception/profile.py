@@ -5,7 +5,6 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass, field
 
-
 _HOSTNAME_PREFIXES = ["web", "api", "db", "cache", "auth", "log", "ci", "queue", "store", "mon"]
 _HOSTNAME_SUFFIXES = ["prod", "staging", "int", "001", "002", "east", "west"]
 _USERNAMES = ["admin", "deploy", "svc-api", "jenkins", "root", "dbadmin", "app-user",

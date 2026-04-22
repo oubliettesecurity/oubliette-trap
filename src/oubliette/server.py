@@ -9,11 +9,11 @@ from typing import Optional
 
 from oubliette.deception.profile import DeceptionProfile
 from oubliette.deception.session import DeceptionSession
+from oubliette.fingerprint.classifier import classify_agent
 from oubliette.fingerprint.passive import compute_passive_signals
 from oubliette.fingerprint.probes import ProbeInjector, check_for_probe_response
-from oubliette.fingerprint.classifier import classify_agent
 from oubliette.intel.events import EventStore
-from oubliette.models import TrapEvent, AgentClassification
+from oubliette.models import AgentClassification, TrapEvent
 
 log = logging.getLogger("oubliette")
 

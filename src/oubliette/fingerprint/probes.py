@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import secrets
-from dataclasses import dataclass
 
 from oubliette.deception.session import DeceptionSession
 
