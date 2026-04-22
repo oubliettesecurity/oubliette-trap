@@ -20,7 +20,9 @@ log = logging.getLogger("oubliette")
 class OublietteTrap:
     """Core trap engine -- composes deception, fingerprinting, and intelligence layers."""
 
-    def __init__(self, profile_name: str = "default", storage_dir: str = "data", active_probes: bool = False):
+    def __init__(
+        self, profile_name: str = "default", storage_dir: str = "data", active_probes: bool = False
+    ):
         self.profile_name = profile_name
         # Template profile used only to enumerate available tool names at registration
         # time. Per-session profiles (with fresh EnvironmentState) are built lazily in
@@ -50,7 +52,9 @@ class OublietteTrap:
             self.profiles[session_id] = profile
         return profile
 
-    def handle_tool_call(self, tool_name: str, arguments: dict, session_id: str, source_ip: str = "unknown") -> dict:
+    def handle_tool_call(
+        self, tool_name: str, arguments: dict, session_id: str, source_ip: str = "unknown"
+    ) -> dict:
         session = self._get_session(session_id, source_ip)
         profile = self._get_profile(session_id)
 
@@ -68,12 +72,21 @@ class OublietteTrap:
             response, _probe_ids = self.probe_injector.inject(response, session)
 
         signals = compute_passive_signals(session)
-        classification = classify_agent(signals, probes_triggered=len(session.probes_triggered), probes_sent=len(session.probes_sent))
+        classification = classify_agent(
+            signals,
+            probes_triggered=len(session.probes_triggered),
+            probes_sent=len(session.probes_sent),
+        )
 
         event = TrapEvent(
-            session_id=session_id, source_ip=source_ip, tool_name=tool_name,
-            arguments=arguments, response_sent=response, deception_profile=profile.name,
-            fingerprint=classification, breadcrumbs_followed=list(session.breadcrumbs_followed),
+            session_id=session_id,
+            source_ip=source_ip,
+            tool_name=tool_name,
+            arguments=arguments,
+            response_sent=response,
+            deception_profile=profile.name,
+            fingerprint=classification,
+            breadcrumbs_followed=list(session.breadcrumbs_followed),
             probes_triggered=list(session.probes_triggered),
         )
         self.event_store.save(event)
@@ -84,7 +97,11 @@ class OublietteTrap:
         if not session:
             return None
         signals = compute_passive_signals(session)
-        return classify_agent(signals, probes_triggered=len(session.probes_triggered), probes_sent=len(session.probes_sent))
+        return classify_agent(
+            signals,
+            probes_triggered=len(session.probes_triggered),
+            probes_sent=len(session.probes_sent),
+        )
 
     def _plant_breadcrumbs(self, session: DeceptionSession, tool_name: str, response: dict) -> None:
         if tool_name == "list_services" and "services" in response:
@@ -102,6 +119,7 @@ class OublietteTrap:
 def create_mcp_server(trap: OublietteTrap):
     """Create a FastMCP server exposing the trap's honey tools."""
     from mcp.server.fastmcp import FastMCP
+
     mcp = FastMCP("oubliette")
     for tool_name in trap.profile.get_tool_names():
         _register_tool(mcp, trap, tool_name)
@@ -121,7 +139,8 @@ def _strip_and_flag_identity_kwargs(kwargs: dict, tool_name: str) -> dict:
     if forged:
         log.warning(
             "Ignoring client-supplied identity kwargs on tool=%s (possible spoofing): %s",
-            tool_name, list(forged.keys()),
+            tool_name,
+            list(forged.keys()),
         )
     return kwargs
 

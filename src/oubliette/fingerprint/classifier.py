@@ -8,7 +8,9 @@ from oubliette.models import AgentClassification, AgentType
 _MIN_CALLS = 3
 
 
-def classify_agent(signals: PassiveSignals, probes_triggered: int = 0, probes_sent: int = 0) -> AgentClassification:
+def classify_agent(
+    signals: PassiveSignals, probes_triggered: int = 0, probes_sent: int = 0
+) -> AgentClassification:
     if signals.total_calls < _MIN_CALLS:
         return AgentClassification(agent_type=AgentType.UNKNOWN, confidence=0.0)
 

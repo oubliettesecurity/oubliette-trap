@@ -7,11 +7,21 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 _TOOL_CATEGORIES = {
-    "list_services": "discovery", "get_environment": "discovery", "whoami": "discovery",
-    "get_credentials": "credential", "rotate_api_key": "credential", "vault_read": "credential",
-    "query_database": "data", "read_config": "data", "list_secrets": "data",
-    "internal_api_call": "lateral", "ssh_connect": "lateral", "deploy_service": "lateral",
-    "admin_panel": "escalation", "modify_permissions": "escalation", "create_user": "escalation",
+    "list_services": "discovery",
+    "get_environment": "discovery",
+    "whoami": "discovery",
+    "get_credentials": "credential",
+    "rotate_api_key": "credential",
+    "vault_read": "credential",
+    "query_database": "data",
+    "read_config": "data",
+    "list_secrets": "data",
+    "internal_api_call": "lateral",
+    "ssh_connect": "lateral",
+    "deploy_service": "lateral",
+    "admin_panel": "escalation",
+    "modify_permissions": "escalation",
+    "create_user": "escalation",
 }
 
 _CATEGORY_DEPTH = {"discovery": 0, "credential": 1, "data": 1, "lateral": 2, "escalation": 3}
@@ -20,6 +30,7 @@ _CATEGORY_DEPTH = {"discovery": 0, "credential": 1, "data": 1, "lateral": 2, "es
 @dataclass
 class DeceptionSession:
     """Tracks an agent's journey through the deception environment."""
+
     session_id: str
     source_ip: str
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())

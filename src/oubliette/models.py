@@ -19,6 +19,7 @@ class AgentType(Enum):
 @dataclass
 class AgentClassification:
     """Result of fingerprinting an interacting entity."""
+
     agent_type: AgentType = AgentType.UNKNOWN
     confidence: float = 0.0
     model_family: str = "unknown"
@@ -38,6 +39,7 @@ class AgentClassification:
 @dataclass
 class TrapEvent:
     """A single interaction with the honeypot."""
+
     session_id: str
     source_ip: str
     tool_name: str
@@ -71,6 +73,7 @@ class TrapEvent:
 @dataclass
 class AgentProfile:
     """Aggregated behavioral profile of an agent across sessions."""
+
     behavioral_signature: str
     profile_id: str = field(default_factory=lambda: f"AGT-{uuid.uuid4().hex[:8].upper()}")
     classification: AgentClassification = field(default_factory=AgentClassification)

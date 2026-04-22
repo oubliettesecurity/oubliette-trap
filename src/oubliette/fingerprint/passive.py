@@ -11,6 +11,7 @@ from oubliette.deception.session import DeceptionSession
 @dataclass
 class PassiveSignals:
     """Computed behavioral signals from a deception session."""
+
     avg_timing_ms: float = 0.0
     timing_regularity: float = 0.0
     category_coverage: int = 0

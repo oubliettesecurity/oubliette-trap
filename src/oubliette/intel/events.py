@@ -49,9 +49,14 @@ class EventStore:
                     breadcrumbs_followed, probes_triggered, mitre_atlas_mapping)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    d["event_id"], d["timestamp"], d["session_id"], d["source_ip"],
-                    d["tool_name"], json.dumps(d["arguments"]),
-                    json.dumps(d["response_sent"]), d["deception_profile"],
+                    d["event_id"],
+                    d["timestamp"],
+                    d["session_id"],
+                    d["source_ip"],
+                    d["tool_name"],
+                    json.dumps(d["arguments"]),
+                    json.dumps(d["response_sent"]),
+                    d["deception_profile"],
                     json.dumps(d["fingerprint"]),
                     json.dumps(d["breadcrumbs_followed"]),
                     json.dumps(d["probes_triggered"]),
@@ -60,10 +65,14 @@ class EventStore:
             )
 
     def get_by_session(self, session_id: str) -> list[dict]:
-        return self._query("SELECT * FROM events WHERE session_id = ? ORDER BY timestamp", (session_id,))
+        return self._query(
+            "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp", (session_id,)
+        )
 
     def get_by_source_ip(self, source_ip: str) -> list[dict]:
-        return self._query("SELECT * FROM events WHERE source_ip = ? ORDER BY timestamp", (source_ip,))
+        return self._query(
+            "SELECT * FROM events WHERE source_ip = ? ORDER BY timestamp", (source_ip,)
+        )
 
     def get_all(self, limit: int = 100) -> list[dict]:
         return self._query("SELECT * FROM events ORDER BY timestamp DESC LIMIT ?", (limit,))
@@ -80,8 +89,14 @@ class EventStore:
             results = []
             for row in rows:
                 d = dict(row)
-                for key in ("arguments", "response_sent", "fingerprint",
-                            "breadcrumbs_followed", "probes_triggered", "mitre_atlas_mapping"):
+                for key in (
+                    "arguments",
+                    "response_sent",
+                    "fingerprint",
+                    "breadcrumbs_followed",
+                    "probes_triggered",
+                    "mitre_atlas_mapping",
+                ):
                     if key in d and isinstance(d[key], str):
                         d[key] = json.loads(d[key])
                 results.append(d)
