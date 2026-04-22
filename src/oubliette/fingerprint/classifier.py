@@ -1,11 +1,31 @@
-"""Rule-based agent classifier -- Phase 1 (no ML required)."""
+"""Rule-based agent classifier -- Phase 1 (no ML required).
+
+HIGH-1 note: this module ships in OSS with its weights visible. The scoring
+cannot be a secret defence; an attacker can read the code and learn to fall
+just under `_MIN_CALLS`, to jitter timing >2s, or to noise at <50ms to target
+a specific bucket. Mitigations applied here:
+
+* `_MIN_CALLS` is env-configurable so operators can raise it per deployment
+  (the OSS default of 3 is a starting point, not a hard limit an attacker
+  can rely on).
+* Confidence is returned as a decisive category WITH a raw-score breakdown
+  so downstream session logic can make risk decisions without relying on a
+  single classifier output. The real defence is multi-signal session-level
+  escalation, not pure classifier accuracy.
+
+Future work: per-deployment salt that jitters score weights within a small
+envelope, plus session-level anomaly detection to catch deliberate evasion
+patterns (e.g. "exactly 3 calls at exactly 50ms intervals").
+"""
 
 from __future__ import annotations
+
+import os
 
 from oubliette.fingerprint.passive import PassiveSignals
 from oubliette.models import AgentClassification, AgentType
 
-_MIN_CALLS = 3
+_MIN_CALLS = int(os.getenv("OUBLIETTE_CLASSIFIER_MIN_CALLS", "3"))
 
 
 def classify_agent(

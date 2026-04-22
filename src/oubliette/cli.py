@@ -19,6 +19,20 @@ def main():
 
     serve_p = sub.add_parser("serve", help="Start the honeypot MCP server")
     serve_p.add_argument("--transport", choices=["stdio", "sse"], default="stdio")
+    # HIGH-6 fix: default SSE bind to loopback so an accidental deployment
+    # does not expose the honeypot to the public internet with no auth. An
+    # operator must pass --host 0.0.0.0 explicitly to make it reachable off-
+    # host. The honey intentionally has no auth today, so public exposure is
+    # a footgun we want to require a conscious opt-in for.
+    serve_p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help=(
+            "Bind address for SSE transport (default: 127.0.0.1). "
+            "Pass 0.0.0.0 to expose on all interfaces -- only do this when "
+            "the host is firewalled or fronted by an authenticating proxy."
+        ),
+    )
     serve_p.add_argument("--port", type=int, default=8080)
     serve_p.add_argument("--profile", default="default", help="Deception profile name")
     serve_p.add_argument(
@@ -62,7 +76,14 @@ def _serve(args):
 
     mcp = create_mcp_server(trap)
     if args.transport == "sse":
-        mcp.run(transport="sse", port=args.port)
+        if args.host == "0.0.0.0":
+            log.warning(
+                "Oubliette SSE transport is binding to 0.0.0.0:%d with NO "
+                "AUTH. Ensure the host is firewalled or fronted by an "
+                "authenticating proxy.",
+                args.port,
+            )
+        mcp.run(transport="sse", host=args.host, port=args.port)
     else:
         mcp.run()
 

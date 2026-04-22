@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import secrets
+from typing import Any
 
 from oubliette.deception.session import DeceptionSession
 
@@ -27,22 +28,48 @@ def inject_instruction_trap(response: dict) -> tuple[dict, str]:
 
 def inject_format_compliance(response: dict) -> tuple[dict, str]:
     code = secrets.token_hex(4).upper()
+    # HIGH fix: probe_id now carries the full expected echo value ("RECV-XXXX")
+    # so leaf-equality detection matches what a compliant agent would actually
+    # submit back as a value. Prior form stored only the bare code and relied
+    # on substring matching against str(arguments), which was smuggle-prone.
+    full_value = f"RECV-{code}"
     modified = copy.deepcopy(response)
-    modified["required_ack_format"] = f"RECV-{code}"
-    return modified, f"format:{code}"
+    modified["required_ack_format"] = full_value
+    return modified, f"format:{full_value}"
+
+
+def _value_appears_as_leaf(target: str, arguments: Any) -> bool:
+    """Return True iff ``target`` appears as a leaf string VALUE in ``arguments``
+    (possibly nested dict / list / tuple).
+
+    HIGH-2/3/5 fix: the previous ``target in str(arguments)`` check matched any
+    substring, so an attacker who observed a canary in one response could embed
+    it inside an unrelated argument field to spoof "probe triggered". Comparing
+    against leaf values (exact equality) eliminates that smuggle path because
+    a leaf value must be supplied verbatim as a key/list element to match.
+    """
+    if isinstance(arguments, str):
+        return arguments == target
+    if isinstance(arguments, dict):
+        return any(_value_appears_as_leaf(target, v) for v in arguments.values())
+    if isinstance(arguments, (list, tuple, set)):
+        return any(_value_appears_as_leaf(target, v) for v in arguments)
+    return False
 
 
 def check_for_probe_response(probe_id: str, arguments: dict) -> bool:
     _probe_type, value = probe_id.split(":", 1)
-    args_str = str(arguments)
-    return value in args_str
+    return _value_appears_as_leaf(value, arguments)
 
 
 class ProbeInjector:
     _PROBE_FUNCTIONS = [inject_canary, inject_instruction_trap, inject_format_compliance]
 
     def inject(self, response: dict, session: DeceptionSession) -> tuple[dict, list[str]]:
-        probe_idx = session.call_count % len(self._PROBE_FUNCTIONS)
+        # HIGH fix: ``session.call_count % 3`` made the first probe per session
+        # deterministic, so an attacker could learn the rotation after a single
+        # call and evade the next one. Pick randomly via a CSPRNG instead.
+        probe_idx = secrets.randbelow(len(self._PROBE_FUNCTIONS))
         probe_fn = self._PROBE_FUNCTIONS[probe_idx]
         modified, probe_id = probe_fn(response)
         session.record_probe_sent(probe_id)

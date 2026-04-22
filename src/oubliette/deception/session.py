@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 _TOOL_CATEGORIES = {
     "list_services": "discovery",
@@ -26,6 +29,30 @@ _TOOL_CATEGORIES = {
 
 _CATEGORY_DEPTH = {"discovery": 0, "credential": 1, "data": 1, "lateral": 2, "escalation": 3}
 
+# Bounds to defeat per-session DoS (unbounded argument_history + oversized args).
+# Override via env for operational tuning; reasonable defaults for a honeypot
+# that should never need huge arg payloads from legitimate callers.
+_MAX_ARG_HISTORY = int(os.getenv("OUBLIETTE_MAX_ARG_HISTORY", "500"))
+_MAX_ARG_BYTES = int(os.getenv("OUBLIETTE_MAX_ARG_BYTES", "16384"))
+
+
+def _value_appears_as_leaf(target: str, arguments: Any) -> bool:
+    """True iff ``target`` appears as a leaf string VALUE in ``arguments``.
+
+    HIGH-2/3/5 fix: ``target in str(arguments)`` was substring-prone -- an
+    attacker who saw a planted breadcrumb in one response could smuggle it
+    inside an unrelated argument and trigger the "followed" counter without
+    ever actually following the breadcrumb. Leaf-value equality eliminates
+    that smuggle path.
+    """
+    if isinstance(arguments, str):
+        return arguments == target
+    if isinstance(arguments, dict):
+        return any(_value_appears_as_leaf(target, v) for v in arguments.values())
+    if isinstance(arguments, (list, tuple, set)):
+        return any(_value_appears_as_leaf(target, v) for v in arguments)
+    return False
+
 
 @dataclass
 class DeceptionSession:
@@ -44,7 +71,11 @@ class DeceptionSession:
     breadcrumbs_followed: list[str] = field(default_factory=list)
     probes_sent: list[str] = field(default_factory=list)
     probes_triggered: list[str] = field(default_factory=list)
-    argument_history: list[dict] = field(default_factory=list)
+    # HIGH-4 fix: cap argument_history to a bounded deque so a noisy attacker
+    # cannot force unbounded memory growth. Oldest entries roll off.
+    argument_history: deque = field(
+        default_factory=lambda: deque(maxlen=_MAX_ARG_HISTORY)
+    )
 
     @property
     def call_count(self) -> int:
@@ -57,15 +88,29 @@ class DeceptionSession:
             self.inter_call_timings_ms.append(gap_ms)
         self.call_timestamps.append(now)
         self.tools_called.append(tool_name)
-        self.argument_history.append({"tool": tool_name, "args": arguments})
+
+        # HIGH-4 fix: truncate oversized args BEFORE they land in history or
+        # flow into str() elsewhere. An attacker passing a 10 MB argument
+        # would previously have caused the full copy to persist per call.
+        try:
+            raw = repr(arguments)
+        except Exception:  # noqa: BLE001
+            raw = ""
+        if len(raw) > _MAX_ARG_BYTES:
+            stored_args: dict[str, Any] = {
+                "__truncated__": True, "__size__": len(raw),
+            }
+        else:
+            stored_args = arguments
+        self.argument_history.append({"tool": tool_name, "args": stored_args})
 
         for bc in self.breadcrumbs_planted:
             bc_tool, bc_value = bc.split(":", 1)
-            if tool_name == bc_tool:
-                arg_str = str(arguments)
-                if bc_value in arg_str:
-                    if bc not in self.breadcrumbs_followed:
-                        self.breadcrumbs_followed.append(bc)
+            # HIGH-2/3/5 fix: field-scoped leaf equality instead of substring
+            # match on str(arguments). See _value_appears_as_leaf doc.
+            if tool_name == bc_tool and _value_appears_as_leaf(bc_value, arguments):
+                if bc not in self.breadcrumbs_followed:
+                    self.breadcrumbs_followed.append(bc)
 
         category = _TOOL_CATEGORIES.get(tool_name, "unknown")
         if category not in self.categories_seen:

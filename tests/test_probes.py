@@ -47,8 +47,10 @@ class TestFormatCompliance:
 
     def test_detect_format_compliance(self):
         _, probe_id = inject_format_compliance({"data": {}})
-        code = probe_id.split(":")[1]
-        result = check_for_probe_response(probe_id, {"ack": f"RECV-{code}"})
+        # probe_id now carries the full planted value ("format:RECV-XXXX")
+        # after the HIGH fix that moved to leaf-equality detection.
+        expected_ack = probe_id.split(":", 1)[1]
+        result = check_for_probe_response(probe_id, {"ack": expected_ack})
         assert result is True
 
 
@@ -60,3 +62,52 @@ class TestProbeInjector:
         modified, probe_ids = injector.inject(response, session)
         assert len(probe_ids) >= 1
         assert len(session.probes_sent) >= 1
+
+
+class TestSubstringSmuggleDefence:
+    """HIGH-2/3/5 regression: attackers used to observe a planted probe value
+    in one response and smuggle it inside an unrelated argument field (e.g.
+    ``{"notes": "my CANARY-abc123 is helpful"}``) to fake probe-triggered.
+    Leaf-equality rejection closes that path."""
+
+    def test_canary_smuggle_in_string_rejected(self):
+        _, probe_id = inject_canary({})
+        value = probe_id.split(":", 1)[1]  # CANARY-xxxxxx
+        # Agent embeds the canary inside a larger string as a smuggle attempt.
+        result = check_for_probe_response(
+            probe_id, {"notes": f"observed {value} in trace"}
+        )
+        assert result is False
+
+    def test_canary_leaf_exact_match_accepted(self):
+        _, probe_id = inject_canary({})
+        value = probe_id.split(":", 1)[1]
+        # Agent actually echoes the canary as a full leaf value -- legitimate.
+        result = check_for_probe_response(probe_id, {"trace_id": value})
+        assert result is True
+
+    def test_canary_in_nested_leaf_accepted(self):
+        _, probe_id = inject_canary({})
+        value = probe_id.split(":", 1)[1]
+        nested = {"meta": {"deep": {"tag": value}}}
+        assert check_for_probe_response(probe_id, nested) is True
+
+
+class TestProbeSelectionNotPredictable:
+    """HIGH regression: probe selection used to be ``call_count % 3``, so an
+    attacker learned the rotation after a single call. Selection now uses
+    secrets.randbelow -- verify the CSPRNG path is reachable (over a large
+    sample we see more than one probe type)."""
+
+    def test_multiple_probe_types_over_many_sessions(self):
+        from collections import Counter
+        injector = ProbeInjector()
+        types_seen = Counter()
+        for i in range(200):
+            session = DeceptionSession(session_id=f"t{i}", source_ip="1.2.3.4")
+            _, probe_ids = injector.inject({}, session)
+            for pid in probe_ids:
+                types_seen[pid.split(":", 1)[0]] += 1
+        # With 3 probe types and 200 samples at 1/3 each, probability of any
+        # single type being absent is ~(2/3)**200 ~ 1e-35 -- effectively zero.
+        assert len(types_seen) == 3, f"expected all 3 probe types, saw {types_seen}"
