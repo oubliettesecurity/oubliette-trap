@@ -73,9 +73,7 @@ class DeceptionSession:
     probes_triggered: list[str] = field(default_factory=list)
     # HIGH-4 fix: cap argument_history to a bounded deque so a noisy attacker
     # cannot force unbounded memory growth. Oldest entries roll off.
-    argument_history: deque = field(
-        default_factory=lambda: deque(maxlen=_MAX_ARG_HISTORY)
-    )
+    argument_history: deque = field(default_factory=lambda: deque(maxlen=_MAX_ARG_HISTORY))
 
     @property
     def call_count(self) -> int:
@@ -98,7 +96,8 @@ class DeceptionSession:
             raw = ""
         if len(raw) > _MAX_ARG_BYTES:
             stored_args: dict[str, Any] = {
-                "__truncated__": True, "__size__": len(raw),
+                "__truncated__": True,
+                "__size__": len(raw),
             }
         else:
             stored_args = arguments
