@@ -94,7 +94,7 @@ class DeceptionSession:
         # would previously have caused the full copy to persist per call.
         try:
             raw = repr(arguments)
-        except Exception:  # noqa: BLE001
+        except Exception:
             raw = ""
         if len(raw) > _MAX_ARG_BYTES:
             stored_args: dict[str, Any] = {
