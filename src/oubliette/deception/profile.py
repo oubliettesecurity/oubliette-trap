@@ -88,7 +88,11 @@ class EnvironmentState:
                 }
             )
 
-        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
+        # MED-04 fix (2026-04-22 audit): shell metacharacters in the fake
+        # password charset (``!@#$%``) caused gratuitous log-injection risk
+        # in naive SIEM/log viewers. These are fake passwords -- there is no
+        # operational reason to include shell-interpolable characters.
+        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
         credentials = []
         for user in usernames:
             pw_len = secrets.randbelow(9) + 16

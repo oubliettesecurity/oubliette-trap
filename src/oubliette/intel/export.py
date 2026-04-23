@@ -67,19 +67,46 @@ def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict:
     return {"type": "bundle", "id": f"bundle--{uuid.uuid4()}", "objects": objects}
 
 
+def _cef_escape_ext(value: object) -> str:
+    """Escape a value for CEF extension fields per ArcSight CEF spec.
+
+    MED-02 fix (2026-04-22 audit): session_id and source_ip were attacker-
+    controllable (via CRIT-2, now fixed) and flowed unescaped into the CEF
+    extension string. Without escaping, an attacker could have injected
+    ``src=... dst=attacker act=Block`` as fake CEF fields and steered SIEM
+    correlation. Escape backslash, pipe, equals, CR, LF per spec.
+    """
+    s = str(value) if value is not None else ""
+    # Order matters: escape backslashes first.
+    s = s.replace("\\", "\\\\")
+    s = s.replace("|", "\\|")
+    s = s.replace("=", "\\=")
+    s = s.replace("\r", "\\r").replace("\n", "\\n")
+    return s
+
+
+def _cef_escape_header(value: object) -> str:
+    """CEF header escaping: pipe and backslash only (no equals)."""
+    s = str(value) if value is not None else ""
+    s = s.replace("\\", "\\\\")
+    s = s.replace("|", "\\|")
+    s = s.replace("\r", " ").replace("\n", " ")
+    return s
+
+
 def export_cef(events: list[TrapEvent]) -> list[str]:
     lines = []
     for event in events:
         severity = _cef_severity(event)
-        name = f"AgentTrap:{event.tool_name}"
+        name = f"AgentTrap:{_cef_escape_header(event.tool_name)}"
         ext = (
-            f"src={event.source_ip} "
-            f"cs1={event.session_id} cs1Label=SessionID "
-            f"cs2={event.fingerprint.agent_type.value} cs2Label=AgentType "
-            f"cs3={event.deception_profile} cs3Label=Profile "
-            f"msg={event.tool_name}"
+            f"src={_cef_escape_ext(event.source_ip)} "
+            f"cs1={_cef_escape_ext(event.session_id)} cs1Label=SessionID "
+            f"cs2={_cef_escape_ext(event.fingerprint.agent_type.value)} cs2Label=AgentType "
+            f"cs3={_cef_escape_ext(event.deception_profile)} cs3Label=Profile "
+            f"msg={_cef_escape_ext(event.tool_name)}"
         )
-        line = f"CEF:0|Oubliette|Trap|0.1.0|{event.tool_name}|{name}|{severity}|{ext}"
+        line = f"CEF:0|Oubliette|Trap|0.1.0|{_cef_escape_header(event.tool_name)}|{name}|{severity}|{ext}"
         lines.append(line)
     return lines
 
