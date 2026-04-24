@@ -46,6 +46,13 @@ def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict:
 
     for event in events:
         ts = event.timestamp if event.timestamp.endswith("Z") else event.timestamp + "Z"
+        # MED-01 fix (2026-04-22 audit): STIX 2.1 requires observed-data to
+        # reference at least one SCO via ``object_refs`` OR carry inline SCOs
+        # in ``objects``. The previous ``object_refs: []`` was invalid and
+        # OpenCTI / MISP silently dropped the observation. Emit an inline
+        # ipv4-addr SCO for the source IP so each event carries a valid
+        # reference; the tool name / session ID remain as x_ extension fields.
+        sco_id = f"ipv4-addr--{uuid.uuid4()}"
         objects.append(
             {
                 "type": "observed-data",
@@ -56,11 +63,19 @@ def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict:
                 "first_observed": event.timestamp,
                 "last_observed": event.timestamp,
                 "number_observed": 1,
-                "object_refs": [],
+                "object_refs": [sco_id],
                 "x_oubliette_tool_name": event.tool_name,
                 "x_oubliette_session_id": event.session_id,
                 "x_oubliette_source_ip": event.source_ip,
                 "x_oubliette_agent_type": event.fingerprint.agent_type.value,
+            }
+        )
+        objects.append(
+            {
+                "type": "ipv4-addr",
+                "spec_version": "2.1",
+                "id": sco_id,
+                "value": event.source_ip,
             }
         )
 

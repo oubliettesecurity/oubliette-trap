@@ -131,9 +131,41 @@ def _export(args):
     if args.output == "-":
         print(output)
     else:
-        with open(args.output, "w") as f:
+        # MED-03 fix (2026-04-22 audit): --output path was passed through to
+        # open() with no scoping, so an operator could write to
+        # /etc/cron.d/evil or ../../authorized_keys. Constrain output to a
+        # configurable directory (default: the storage_dir) and refuse
+        # overwrites of existing executable files. Not a privilege
+        # escalation vector but a meaningful footgun during IR; containerised
+        # deployments especially need this guard.
+        import os
+
+        base_dir = os.path.abspath(args.storage_dir)
+        resolved = os.path.abspath(args.output)
+        try:
+            common = os.path.commonpath([resolved, base_dir])
+        except ValueError:
+            common = ""
+        if common != base_dir:
+            print(
+                f"refusing to write outside {base_dir!r}; "
+                f"pass --output under the storage dir",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        if os.path.exists(resolved) and os.access(resolved, os.X_OK):
+            print(
+                f"refusing to overwrite executable file: {resolved}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        # O_NOFOLLOW defeats operator-smuggled symlinks out of the base dir;
+        # 0o600 keeps the export from being world-readable.
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(resolved, flags, 0o600)
+        with os.fdopen(fd, "w") as f:
             f.write(output)
-        print(f"Exported {len(events)} events to {args.output}", file=sys.stderr)
+        print(f"Exported {len(events)} events to {resolved}", file=sys.stderr)
 
 
 if __name__ == "__main__":
