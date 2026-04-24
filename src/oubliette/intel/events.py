@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from oubliette.models import TrapEvent
 
@@ -64,25 +65,28 @@ class EventStore:
                 ),
             )
 
-    def get_by_session(self, session_id: str) -> list[dict]:
+    def get_by_session(self, session_id: str) -> list[dict[str, Any]]:
         return self._query(
             "SELECT * FROM events WHERE session_id = ? ORDER BY timestamp", (session_id,)
         )
 
-    def get_by_source_ip(self, source_ip: str) -> list[dict]:
+    def get_by_source_ip(self, source_ip: str) -> list[dict[str, Any]]:
         return self._query(
             "SELECT * FROM events WHERE source_ip = ? ORDER BY timestamp", (source_ip,)
         )
 
-    def get_all(self, limit: int = 100) -> list[dict]:
+    def get_all(self, limit: int = 100) -> list[dict[str, Any]]:
         return self._query("SELECT * FROM events ORDER BY timestamp DESC LIMIT ?", (limit,))
 
     def count(self) -> int:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute("SELECT COUNT(*) FROM events").fetchone()
-            return row[0]
+            count: int = row[0]
+            return count
 
-    def _query(self, sql: str, params: tuple = ()) -> list[dict]:
+    def _query(
+        self, sql: str, params: tuple[Any, ...] = ()
+    ) -> list[dict[str, Any]]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, params).fetchall()

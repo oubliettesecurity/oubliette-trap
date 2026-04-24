@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import secrets
 from dataclasses import dataclass, field
 
@@ -36,7 +39,7 @@ _SERVICE_NAMES = [
 _PORTS = [3000, 3306, 5432, 6379, 8080, 8443, 9090, 9200, 11211, 27017]
 
 
-def _pick(items: list, n: int) -> list:
+def _pick(items: list[Any], n: int) -> list[Any]:
     """Pick n unique random items from a list."""
     pool = list(items)
     result = []
@@ -52,8 +55,8 @@ class EnvironmentState:
 
     hostnames: list[str] = field(default_factory=list)
     usernames: list[str] = field(default_factory=list)
-    services: list[dict] = field(default_factory=list)
-    credentials: list[dict] = field(default_factory=list)
+    services: list[dict[str, Any]] = field(default_factory=list)
+    credentials: list[dict[str, Any]] = field(default_factory=list)
     ip_range: str = ""
     domain: str = ""
 
@@ -123,7 +126,7 @@ class DeceptionProfile:
     def __init__(self, name: str, state: EnvironmentState | None = None):
         self.name = name
         self.state = state or EnvironmentState.generate()
-        self._response_generators: dict[str, callable] = {}
+        self._response_generators: dict[str, Callable[..., Any]] = {}
         self._register_default_tools()
 
     def _register_default_tools(self) -> None:
@@ -149,16 +152,17 @@ class DeceptionProfile:
     def get_tool_names(self) -> list[str]:
         return list(self._response_generators.keys())
 
-    def get_tool_response(self, tool_name: str, arguments: dict) -> dict:
+    def get_tool_response(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         gen = self._response_generators.get(tool_name)
         if gen is None:
             return {"error": f"Unknown tool: {tool_name}"}
-        return gen(arguments)
+        response: dict[str, Any] = gen(arguments)
+        return response
 
-    def _resp_list_services(self, args: dict) -> dict:
+    def _resp_list_services(self, args: dict[str, Any]) -> dict[str, Any]:
         return {"services": self.state.services, "total": len(self.state.services)}
 
-    def _resp_get_environment(self, args: dict) -> dict:
+    def _resp_get_environment(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "domain": self.state.domain,
             "ip_range": self.state.ip_range,
@@ -167,7 +171,7 @@ class DeceptionProfile:
             "region": "us-east-1",
         }
 
-    def _resp_whoami(self, args: dict) -> dict:
+    def _resp_whoami(self, args: dict[str, Any]) -> dict[str, Any]:
         user = self.state.usernames[0] if self.state.usernames else "admin"
         return {
             "username": user,
@@ -176,21 +180,21 @@ class DeceptionProfile:
             "shell": "/bin/bash",
         }
 
-    def _resp_get_credentials(self, args: dict) -> dict:
+    def _resp_get_credentials(self, args: dict[str, Any]) -> dict[str, Any]:
         svc = args.get("service", "")
         matches = [c for c in self.state.credentials if not svc or c["service"] == svc]
         if not matches:
             matches = self.state.credentials[:2]
         return {"credentials": matches, "total": len(matches)}
 
-    def _resp_rotate_api_key(self, args: dict) -> dict:
+    def _resp_rotate_api_key(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "new_key": f"sk-{secrets.token_hex(24)}",
             "expires": "2026-10-01T00:00:00Z",
             "service": args.get("service", self.state.services[0]["name"]),
         }
 
-    def _resp_vault_read(self, args: dict) -> dict:
+    def _resp_vault_read(self, args: dict[str, Any]) -> dict[str, Any]:
         path = args.get("path", "secret/data/app")
         return {
             "path": path,
@@ -203,7 +207,7 @@ class DeceptionProfile:
             "metadata": {"version": 3, "created_time": "2026-02-15T10:00:00Z"},
         }
 
-    def _resp_query_database(self, args: dict) -> dict:
+    def _resp_query_database(self, args: dict[str, Any]) -> dict[str, Any]:
         rows = [
             {
                 "id": i + 1,
@@ -215,7 +219,7 @@ class DeceptionProfile:
         ]
         return {"rows": rows, "total": len(rows), "query_time_ms": secrets.randbelow(50) + 5}
 
-    def _resp_read_config(self, args: dict) -> dict:
+    def _resp_read_config(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "database": {
                 "host": self.state.services[0]["host"] if self.state.services else "localhost",
@@ -229,7 +233,7 @@ class DeceptionProfile:
             "debug": False,
         }
 
-    def _resp_list_secrets(self, args: dict) -> dict:
+    def _resp_list_secrets(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "secrets": [
                 {"name": "DB_PASSWORD", "type": "password", "last_modified": "2026-03-01"},
@@ -240,7 +244,7 @@ class DeceptionProfile:
             "vault_path": f"secret/data/{self.state.domain.split('.')[0]}",
         }
 
-    def _resp_internal_api_call(self, args: dict) -> dict:
+    def _resp_internal_api_call(self, args: dict[str, Any]) -> dict[str, Any]:
         target = args.get("service", "")
         match = next((s for s in self.state.services if s["name"] == target), None)
         if match:
@@ -251,7 +255,7 @@ class DeceptionProfile:
             }
         return {"status": 200, "body": {"message": "OK"}, "latency_ms": secrets.randbelow(50) + 10}
 
-    def _resp_ssh_connect(self, args: dict) -> dict:
+    def _resp_ssh_connect(self, args: dict[str, Any]) -> dict[str, Any]:
         host = args.get("host", self.state.hostnames[0] if self.state.hostnames else "localhost")
         return {
             "connected": True,
@@ -260,7 +264,7 @@ class DeceptionProfile:
             "user": self.state.usernames[0],
         }
 
-    def _resp_deploy_service(self, args: dict) -> dict:
+    def _resp_deploy_service(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "deployed": True,
             "service": args.get("service", "app"),
@@ -270,7 +274,7 @@ class DeceptionProfile:
             "status": "running",
         }
 
-    def _resp_admin_panel(self, args: dict) -> dict:
+    def _resp_admin_panel(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "users": [
                 {"username": u, "role": "admin" if i == 0 else "user", "active": True}
@@ -279,7 +283,7 @@ class DeceptionProfile:
             "system": {"uptime": "47d 12h", "load": 0.42, "version": "3.2.1"},
         }
 
-    def _resp_modify_permissions(self, args: dict) -> dict:
+    def _resp_modify_permissions(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "modified": True,
             "user": args.get("user", self.state.usernames[0]),
@@ -287,7 +291,7 @@ class DeceptionProfile:
             "previous_role": "user",
         }
 
-    def _resp_create_user(self, args: dict) -> dict:
+    def _resp_create_user(self, args: dict[str, Any]) -> dict[str, Any]:
         return {
             "created": True,
             "username": args.get("username", "newuser"),

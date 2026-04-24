@@ -11,7 +11,7 @@ from oubliette.intel.export import export_cef, export_json, export_stix
 from oubliette.server import OublietteTrap, create_mcp_server
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         prog="oubliette", description="Oubliette -- AI Agent Deception Platform"
     )
@@ -56,7 +56,7 @@ def main():
         parser.print_help()
 
 
-def _serve(args):
+def _serve(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(levelname)s %(name)s: %(message)s",
@@ -83,12 +83,20 @@ def _serve(args):
                 "authenticating proxy.",
                 args.port,
             )
-        mcp.run(transport="sse", host=args.host, port=args.port)
+        # Same MCP SDK API change caught in find-evil: FastMCP.run() no
+        # longer accepts host/port -- they're attributes on mcp.settings.
+        # The kwargs were silently dropped, so --host 0.0.0.0 and --port
+        # had no effect; every Trap SSE deployment was listening on the
+        # default 127.0.0.1:8000 regardless of the CLI flags. Real prod
+        # bug; plumb via settings before run().
+        mcp.settings.host = args.host
+        mcp.settings.port = args.port
+        mcp.run(transport="sse")
     else:
         mcp.run()
 
 
-def _export(args):
+def _export(args: argparse.Namespace) -> None:
     from oubliette.intel.events import EventStore
     from oubliette.models import AgentClassification, AgentType, TrapEvent
 

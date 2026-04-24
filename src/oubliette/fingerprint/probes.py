@@ -9,14 +9,14 @@ from typing import Any
 from oubliette.deception.session import DeceptionSession
 
 
-def inject_canary(response: dict) -> tuple[dict, str]:
+def inject_canary(response: dict[str, Any]) -> tuple[dict[str, Any], str]:
     canary = f"CANARY-{secrets.token_hex(6)}"
     modified = copy.deepcopy(response)
     modified["_trace_id"] = canary
     return modified, f"canary:{canary}"
 
 
-def inject_instruction_trap(response: dict) -> tuple[dict, str]:
+def inject_instruction_trap(response: dict[str, Any]) -> tuple[dict[str, Any], str]:
     code = secrets.token_hex(4).upper()
     modified = copy.deepcopy(response)
     modified["_system_note"] = (
@@ -26,7 +26,7 @@ def inject_instruction_trap(response: dict) -> tuple[dict, str]:
     return modified, f"instruction:{code}"
 
 
-def inject_format_compliance(response: dict) -> tuple[dict, str]:
+def inject_format_compliance(response: dict[str, Any]) -> tuple[dict[str, Any], str]:
     code = secrets.token_hex(4).upper()
     # HIGH fix: probe_id now carries the full expected echo value ("RECV-XXXX")
     # so leaf-equality detection matches what a compliant agent would actually
@@ -57,7 +57,7 @@ def _value_appears_as_leaf(target: str, arguments: Any) -> bool:
     return False
 
 
-def check_for_probe_response(probe_id: str, arguments: dict) -> bool:
+def check_for_probe_response(probe_id: str, arguments: dict[str, Any]) -> bool:
     _probe_type, value = probe_id.split(":", 1)
     return _value_appears_as_leaf(value, arguments)
 
@@ -65,7 +65,9 @@ def check_for_probe_response(probe_id: str, arguments: dict) -> bool:
 class ProbeInjector:
     _PROBE_FUNCTIONS = [inject_canary, inject_instruction_trap, inject_format_compliance]
 
-    def inject(self, response: dict, session: DeceptionSession) -> tuple[dict, list[str]]:
+    def inject(
+        self, response: dict[str, Any], session: DeceptionSession
+    ) -> tuple[dict[str, Any], list[str]]:
         # HIGH fix: ``session.call_count % 3`` made the first probe per session
         # deterministic, so an attacker could learn the rotation after a single
         # call and evade the next one. Pick randomly via a CSPRNG instead.

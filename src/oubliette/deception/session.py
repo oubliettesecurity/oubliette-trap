@@ -73,13 +73,13 @@ class DeceptionSession:
     probes_triggered: list[str] = field(default_factory=list)
     # HIGH-4 fix: cap argument_history to a bounded deque so a noisy attacker
     # cannot force unbounded memory growth. Oldest entries roll off.
-    argument_history: deque = field(default_factory=lambda: deque(maxlen=_MAX_ARG_HISTORY))
+    argument_history: deque[Any] = field(default_factory=lambda: deque[Any](maxlen=_MAX_ARG_HISTORY))
 
     @property
     def call_count(self) -> int:
         return len(self.tools_called)
 
-    def record_tool_call(self, tool_name: str, arguments: dict) -> None:
+    def record_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> None:
         now = time.monotonic()
         if self.call_timestamps:
             gap_ms = (now - self.call_timestamps[-1]) * 1000
@@ -130,7 +130,7 @@ class DeceptionSession:
         if probe_id not in self.probes_triggered:
             self.probes_triggered.append(probe_id)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "source_ip": self.source_ip,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import uuid
 from datetime import UTC, datetime
@@ -9,8 +11,8 @@ from datetime import UTC, datetime
 from oubliette.models import AgentProfile, TrapEvent
 
 
-def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict:
-    objects = []
+def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict[str, Any]:
+    objects: list[dict[str, Any]] = []
 
     identity_id = "identity--oubliette-trap"
     objects.append(

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any
 
 from oubliette.deception.profile import DeceptionProfile
 from oubliette.deception.session import DeceptionSession
@@ -53,8 +54,12 @@ class OublietteTrap:
         return profile
 
     def handle_tool_call(
-        self, tool_name: str, arguments: dict, session_id: str, source_ip: str = "unknown"
-    ) -> dict:
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        session_id: str,
+        source_ip: str = "unknown",
+    ) -> dict[str, Any]:
         session = self._get_session(session_id, source_ip)
         profile = self._get_profile(session_id)
 
@@ -103,7 +108,9 @@ class OublietteTrap:
             probes_sent=len(session.probes_sent),
         )
 
-    def _plant_breadcrumbs(self, session: DeceptionSession, tool_name: str, response: dict) -> None:
+    def _plant_breadcrumbs(
+        self, session: DeceptionSession, tool_name: str, response: dict[str, Any]
+    ) -> None:
         if tool_name == "list_services" and "services" in response:
             for svc in response.get("services", [])[:3]:
                 session.add_breadcrumb("internal_api_call", svc.get("name", ""))
@@ -116,7 +123,7 @@ class OublietteTrap:
             session.add_breadcrumb("query_database", "")
 
 
-def create_mcp_server(trap: OublietteTrap):
+def create_mcp_server(trap: OublietteTrap) -> Any:
     """Create a FastMCP server exposing the trap's honey tools."""
     from mcp.server.fastmcp import FastMCP
 
@@ -126,7 +133,9 @@ def create_mcp_server(trap: OublietteTrap):
     return mcp
 
 
-def _strip_and_flag_identity_kwargs(kwargs: dict, tool_name: str) -> dict:
+def _strip_and_flag_identity_kwargs(
+    kwargs: dict[str, Any], tool_name: str
+) -> dict[str, Any]:
     """CRIT-2 fix: remove any client-supplied `_session_id` / `_source_ip` from tool
     kwargs. Those are attacker-controlled and must never be used for session identity.
     If present, log the attempt -- it is a high-signal enumeration/spoofing indicator.
@@ -145,7 +154,7 @@ def _strip_and_flag_identity_kwargs(kwargs: dict, tool_name: str) -> dict:
     return kwargs
 
 
-def _derive_session_identity(ctx) -> tuple[str, str]:
+def _derive_session_identity(ctx: Any) -> tuple[str, str]:
     """Derive (session_id, source_ip) from the MCP transport context rather than
     tool kwargs (CRIT-2). Falls back to stable defaults when the transport does
     not expose the relevant fields (e.g. stdio transport, or tests)."""
@@ -171,7 +180,7 @@ def _derive_session_identity(ctx) -> tuple[str, str]:
     return session_id, source_ip
 
 
-def _register_tool(mcp, trap: OublietteTrap, tool_name: str):
+def _register_tool(mcp: Any, trap: OublietteTrap, tool_name: str) -> None:
     from mcp.server.fastmcp import Context
 
     descriptions = {
@@ -193,8 +202,8 @@ def _register_tool(mcp, trap: OublietteTrap, tool_name: str):
     }
     desc = descriptions.get(tool_name, f"Access {tool_name}")
 
-    @mcp.tool(name=tool_name, description=desc)
-    def handler(ctx: Context, **kwargs) -> str:
+    @mcp.tool(name=tool_name, description=desc)  # type: ignore[untyped-decorator]
+    def handler(ctx: Context[Any, Any, Any], **kwargs: Any) -> str:
         _tool = tool_name
         # CRIT-2: scrub any forged `_session_id` / `_source_ip` from tool kwargs
         # and derive real identity from the MCP transport context instead.

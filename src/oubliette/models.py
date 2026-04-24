@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 class AgentType(Enum):
@@ -26,7 +27,7 @@ class AgentClassification:
     capabilities: list[str] = field(default_factory=list)
     behavioral_signature: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_type": self.agent_type.value,
             "confidence": self.confidence,
@@ -43,17 +44,17 @@ class TrapEvent:
     session_id: str
     source_ip: str
     tool_name: str
-    arguments: dict
-    response_sent: dict
+    arguments: dict[str, Any]
+    response_sent: dict[str, Any]
     deception_profile: str
     event_id: str = field(default_factory=lambda: f"EVT-{uuid.uuid4().hex[:8].upper()}")
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     fingerprint: AgentClassification = field(default_factory=AgentClassification)
     breadcrumbs_followed: list[str] = field(default_factory=list)
     probes_triggered: list[str] = field(default_factory=list)
-    mitre_atlas_mapping: dict = field(default_factory=dict)
+    mitre_atlas_mapping: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_id": self.event_id,
             "timestamp": self.timestamp,
@@ -97,7 +98,7 @@ class AgentProfile:
             if tool not in self.tools_targeted:
                 self.tools_targeted.append(tool)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "profile_id": self.profile_id,
             "behavioral_signature": self.behavioral_signature,
