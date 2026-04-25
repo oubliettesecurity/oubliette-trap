@@ -37,3 +37,21 @@ jobs:
           pip install -e ".[dev]"
       - name: Run tests
         run: pytest tests/ -q
+
+  mypy:
+    # Locks in the mypy-strict-clean state of src/oubliette/. Regression on
+    # any future PR (missing annotation, Any-leak) fails CI the same way a
+    # ruff violation does.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install mypy + runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy
+          pip install -e ".[dev]"
+      - name: mypy --strict on src/oubliette/
+        run: python -m mypy --strict --follow-imports=silent src/oubliette/
