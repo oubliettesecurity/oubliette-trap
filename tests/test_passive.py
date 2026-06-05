@@ -1,7 +1,7 @@
 """Tests for passive fingerprinting signals."""
 import pytest
-from oubliette.fingerprint.passive import PassiveSignals, compute_passive_signals
-from oubliette.deception.session import DeceptionSession
+from oubliette_trap.fingerprint.passive import PassiveSignals, compute_passive_signals
+from oubliette_trap.deception.session import DeceptionSession
 
 
 class TestTimingSignals:

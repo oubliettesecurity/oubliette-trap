@@ -1,8 +1,8 @@
 """Tests for rule-based agent classifier."""
 import pytest
-from oubliette.fingerprint.classifier import classify_agent
-from oubliette.fingerprint.passive import PassiveSignals
-from oubliette.models import AgentType
+from oubliette_trap.fingerprint.classifier import classify_agent
+from oubliette_trap.fingerprint.passive import PassiveSignals
+from oubliette_trap.models import AgentType
 
 
 class TestClassifier:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass
 
-from oubliette.deception.session import DeceptionSession
+from oubliette_trap.deception.session import DeceptionSession
 
 
 @dataclass

@@ -1,8 +1,8 @@
 """Tests for intelligence export (STIX, CEF, JSON)."""
 import json
 import pytest
-from oubliette.intel.export import export_stix, export_cef, export_json
-from oubliette.models import TrapEvent, AgentClassification, AgentType, AgentProfile
+from oubliette_trap.intel.export import export_stix, export_cef, export_json
+from oubliette_trap.models import TrapEvent, AgentClassification, AgentType, AgentProfile
 
 
 @pytest.fixture

@@ -1,8 +1,8 @@
 """Verify the ported revenue SDK works in Trap (issuer -> validator round-trip)."""
 
-from oubliette.license import LicenseManager, PRO_FEATURES
-from oubliette.license_issuer import issue_license
-from oubliette.license_webhook import license_for_sale
+from oubliette_trap.license import LicenseManager, PRO_FEATURES
+from oubliette_trap.license_issuer import issue_license
+from oubliette_trap.license_webhook import license_for_sale
 
 
 def test_issued_pro_key_validates():

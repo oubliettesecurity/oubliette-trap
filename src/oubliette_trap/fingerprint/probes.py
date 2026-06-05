@@ -6,7 +6,7 @@ import copy
 import secrets
 from typing import Any
 
-from oubliette.deception.session import DeceptionSession
+from oubliette_trap.deception.session import DeceptionSession
 
 
 def inject_canary(response: dict[str, Any]) -> tuple[dict[str, Any], str]:

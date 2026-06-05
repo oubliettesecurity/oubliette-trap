@@ -27,7 +27,7 @@ dev = ["pytest>=8.0", "pytest-asyncio>=1.0"]
 test = ["oubliette-trap[dev]"]
 
 [project.scripts]
-oubliette = "oubliette.cli:main"
+oubliette-trap = "oubliette_trap.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

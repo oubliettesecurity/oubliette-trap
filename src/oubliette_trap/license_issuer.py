@@ -10,7 +10,7 @@ is the secret that authorizes Pro/Enterprise tiers. The same module powers the
 Gumroad/Paddle webhook handler (``license_webhook.py``).
 
 Usage:
-    from oubliette.license_issuer import issue_license
+    from oubliette_trap.license_issuer import issue_license
     key = issue_license(org="Acme", tier="pro", features=[...], signing_key=SECRET)
 """
 

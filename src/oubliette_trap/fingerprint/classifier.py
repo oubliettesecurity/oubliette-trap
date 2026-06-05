@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import os
 
-from oubliette.fingerprint.passive import PassiveSignals
-from oubliette.models import AgentClassification, AgentType
+from oubliette_trap.fingerprint.passive import PassiveSignals
+from oubliette_trap.models import AgentClassification, AgentType
 
 _MIN_CALLS = int(os.getenv("OUBLIETTE_CLASSIFIER_MIN_CALLS", "3"))
 

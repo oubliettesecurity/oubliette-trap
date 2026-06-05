@@ -18,17 +18,17 @@ Oubliette deploys realistic honeypot MCP servers that attract, contain, fingerpr
 pip install oubliette-trap
 
 # Start honeypot (stdio transport for Claude Code)
-oubliette serve
+oubliette-trap serve
 
 # Network-accessible honeypot
-oubliette serve --transport sse --port 8080
+oubliette-trap serve --transport sse --port 8080
 
 # With active fingerprinting probes
-oubliette serve --profile default --active-probes
+oubliette-trap serve --profile default --active-probes
 
 # Export collected intelligence
-oubliette export --format stix --output agents.json
-oubliette export --format cef --output events.log
+oubliette-trap export --format stix --output agents.json
+oubliette-trap export --format cef --output events.log
 ```
 
 ### With Claude Code
@@ -38,7 +38,7 @@ Add to your MCP config:
 {
   "mcpServers": {
     "oubliette": {
-      "command": "oubliette",
+      "command": "oubliette-trap",
       "args": ["serve"]
     }
   }

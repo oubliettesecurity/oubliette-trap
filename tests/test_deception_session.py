@@ -1,6 +1,6 @@
 """Tests for DeceptionSession -- per-agent state and breadcrumb tracking."""
 import pytest
-from oubliette.deception.session import DeceptionSession
+from oubliette_trap.deception.session import DeceptionSession
 
 
 class TestDeceptionSession:

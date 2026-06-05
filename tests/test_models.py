@@ -1,6 +1,6 @@
 """Tests for core data models."""
 import pytest
-from oubliette.models import (
+from oubliette_trap.models import (
     AgentType, AgentClassification,
     TrapEvent, AgentProfile,
 )

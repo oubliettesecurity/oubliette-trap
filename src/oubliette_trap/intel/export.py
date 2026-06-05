@@ -8,7 +8,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from oubliette.models import AgentProfile, TrapEvent
+from oubliette_trap.models import AgentProfile, TrapEvent
 
 
 def export_stix(events: list[TrapEvent], profiles: list[AgentProfile]) -> dict[str, Any]:

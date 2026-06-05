@@ -7,13 +7,13 @@ import json
 import logging
 import sys
 
-from oubliette.intel.export import export_cef, export_json, export_stix
-from oubliette.server import OublietteTrap, create_mcp_server
+from oubliette_trap.intel.export import export_cef, export_json, export_stix
+from oubliette_trap.server import OublietteTrap, create_mcp_server
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="oubliette", description="Oubliette -- AI Agent Deception Platform"
+        prog="oubliette-trap", description="Oubliette Trap -- AI Agent Deception Platform"
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -97,8 +97,8 @@ def _serve(args: argparse.Namespace) -> None:
 
 
 def _export(args: argparse.Namespace) -> None:
-    from oubliette.intel.events import EventStore
-    from oubliette.models import AgentClassification, AgentType, TrapEvent
+    from oubliette_trap.intel.events import EventStore
+    from oubliette_trap.models import AgentClassification, AgentType, TrapEvent
 
     store = EventStore(db_path=f"{args.storage_dir}/oubliette.db")
     raw_events = store.get_all(limit=10000)

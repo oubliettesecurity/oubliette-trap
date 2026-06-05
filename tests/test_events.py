@@ -1,7 +1,7 @@
 """Tests for TrapEvent storage."""
 import pytest
-from oubliette.intel.events import EventStore
-from oubliette.models import TrapEvent
+from oubliette_trap.intel.events import EventStore
+from oubliette_trap.models import TrapEvent
 
 
 @pytest.fixture

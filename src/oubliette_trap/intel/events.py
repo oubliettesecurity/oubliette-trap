@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from oubliette.models import TrapEvent
+from oubliette_trap.models import TrapEvent
 
 
 class EventStore:

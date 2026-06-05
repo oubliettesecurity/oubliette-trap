@@ -7,13 +7,13 @@ import logging
 import os
 from typing import Any
 
-from oubliette.deception.profile import DeceptionProfile
-from oubliette.deception.session import DeceptionSession
-from oubliette.fingerprint.classifier import classify_agent
-from oubliette.fingerprint.passive import compute_passive_signals
-from oubliette.fingerprint.probes import ProbeInjector, check_for_probe_response
-from oubliette.intel.events import EventStore
-from oubliette.models import AgentClassification, TrapEvent
+from oubliette_trap.deception.profile import DeceptionProfile
+from oubliette_trap.deception.session import DeceptionSession
+from oubliette_trap.fingerprint.classifier import classify_agent
+from oubliette_trap.fingerprint.passive import compute_passive_signals
+from oubliette_trap.fingerprint.probes import ProbeInjector, check_for_probe_response
+from oubliette_trap.intel.events import EventStore
+from oubliette_trap.models import AgentClassification, TrapEvent
 
 log = logging.getLogger("oubliette")
 

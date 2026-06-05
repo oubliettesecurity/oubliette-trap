@@ -1,6 +1,6 @@
 """Tests for DeceptionProfile and EnvironmentState."""
 import pytest
-from oubliette.deception.profile import DeceptionProfile, EnvironmentState
+from oubliette_trap.deception.profile import DeceptionProfile, EnvironmentState
 
 
 class TestEnvironmentState:

@@ -1,6 +1,6 @@
 """Tests for the honeypot MCP server wiring."""
 import pytest
-from oubliette.server import OublietteTrap
+from oubliette_trap.server import OublietteTrap
 
 
 class TestOublietteTrap:
@@ -78,7 +78,7 @@ class TestIdentityNotClientControlled:
     identity. The MCP transport layer owns session_id / source_ip."""
 
     def test_strip_and_flag_identity_kwargs_scrubs_underscore_prefixed(self, tmp_path):
-        from oubliette.server import _strip_and_flag_identity_kwargs
+        from oubliette_trap.server import _strip_and_flag_identity_kwargs
         raw = {"service": "payment", "_session_id": "forged-victim", "_source_ip": "1.2.3.4"}
         cleaned = _strip_and_flag_identity_kwargs(dict(raw), "get_credentials")
         assert "_session_id" not in cleaned

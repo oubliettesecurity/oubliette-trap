@@ -1,10 +1,10 @@
 """Tests for active probe injection and detection."""
 import pytest
-from oubliette.fingerprint.probes import (
+from oubliette_trap.fingerprint.probes import (
     ProbeInjector, inject_canary, inject_instruction_trap,
     inject_format_compliance, check_for_probe_response,
 )
-from oubliette.deception.session import DeceptionSession
+from oubliette_trap.deception.session import DeceptionSession
 
 
 class TestCanaryProbes:
