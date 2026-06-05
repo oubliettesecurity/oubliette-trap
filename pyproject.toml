@@ -23,6 +23,8 @@ dependencies = [
 [project.optional-dependencies]
 api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 dev = ["pytest>=8.0", "pytest-asyncio>=1.0"]
+# Clean-machine test environment: `uv pip install -e ".[test]" && pytest` -> green.
+test = ["oubliette-trap[dev]"]
 
 [project.scripts]
 oubliette = "oubliette.cli:main"
