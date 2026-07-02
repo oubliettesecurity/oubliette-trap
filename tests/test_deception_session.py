@@ -7,13 +7,13 @@ class TestDeceptionSession:
     def test_create(self):
         s = DeceptionSession(session_id="sess-001", source_ip="10.0.0.1")
         assert s.session_id == "sess-001"
-        assert s.tools_called == []
+        assert list(s.tools_called) == []
         assert s.breadcrumbs_seen == []
 
     def test_record_tool_call(self):
         s = DeceptionSession(session_id="sess-001", source_ip="10.0.0.1")
         s.record_tool_call("list_services", {"filter": "all"})
-        assert s.tools_called == ["list_services"]
+        assert list(s.tools_called) == ["list_services"]
         assert s.call_count == 1
         assert len(s.call_timestamps) == 1
 
