@@ -48,6 +48,52 @@ _DEFAULT_MONTHLY_QUOTA = 10_000
 # How long to cache a validated license (seconds)
 _VALIDATION_CACHE_TTL = 3600  # 1 hour
 
+# Ed25519 public key (base64 of the raw 32-byte key) used to verify
+# asymmetrically-signed licenses. Ships EMPTY on purpose: the vendor runs
+# ``python -m oubliette_trap.license_issuer keygen``, keeps the PRIVATE key
+# server-side (the license issuer), and pastes the PUBLIC key here — or sets the
+# ``OUBLIETTE_LICENSE_PUBLIC_KEY`` env var — before publishing. Distributing the
+# public key is safe; it can only verify, never mint. An empty/unset public key
+# means Ed25519 licenses cannot be verified and fail closed to the free tier.
+_BUNDLED_PUBLIC_KEY = ""
+
+
+def _canonical_payload(data: dict[str, Any]) -> str:
+    """Serialize a license payload for signing/verification.
+
+    Excludes the signature envelope fields (``sig``/``sig_alg``) so issuer and
+    verifier sign/verify exactly the same bytes. Sorted + compact so the
+    encoding is deterministic across processes and versions.
+    """
+    body = {k: v for k, v in data.items() if k not in ("sig", "sig_alg")}
+    return json.dumps(body, sort_keys=True, separators=(",", ":"))
+
+
+def generate_keypair() -> tuple[str, str]:
+    """Generate an Ed25519 keypair for license signing.
+
+    Returns ``(private_b64, public_b64)`` — base64 of the raw 32-byte seed and
+    the raw 32-byte public key. Keep the private value secret (server-side);
+    embed/distribute the public value with the client.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    priv_raw = priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    pub_raw = priv.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return (
+        base64.b64encode(priv_raw).decode("ascii"),
+        base64.b64encode(pub_raw).decode("ascii"),
+    )
+
 
 class LicenseInfo:
     """Parsed and validated license data."""
@@ -103,9 +149,19 @@ class LicenseManager:
         storage_backend: Optional storage backend for persisting usage data.
     """
 
-    def __init__(self, signing_key: str | None = None, storage_backend: Any = None) -> None:
+    def __init__(
+        self,
+        signing_key: str | None = None,
+        storage_backend: Any = None,
+        public_key: str | None = None,
+    ) -> None:
         self._lock = threading.RLock()
         self._signing_key = signing_key or os.getenv("OUBLIETTE_LICENSE_SIGNING_KEY", "")
+        # Ed25519 public key (base64) for verifying asymmetric licenses. Prefers
+        # an explicit arg, then env, then the bundled constant.
+        self._public_key = (
+            public_key or os.getenv("OUBLIETTE_LICENSE_PUBLIC_KEY", "") or _BUNDLED_PUBLIC_KEY
+        )
         self._storage = storage_backend
         self._license: LicenseInfo | None = None
         self._validated_at: float = 0.0
@@ -137,26 +193,49 @@ class LicenseManager:
             return
 
         sig = data.pop("sig", "")
-        # FAIL CLOSED: without a signing key we cannot verify the signature, so
-        # we must not trust the tier the (unsigned) blob claims. An empty
-        # signing key would otherwise let anyone hand-craft an "enterprise"
-        # license. Force free tier instead.
-        if not self._signing_key:
-            log.warning(
-                "[LICENSE] No signing key configured -- cannot verify license; "
-                "falling back to free tier"
-            )
-            self._license = _FREE_LICENSE
-            return
+        # Signature algorithm. Legacy blobs predate this field and are HMAC.
+        sig_alg = data.pop("sig_alg", "hmac")
+        payload = _canonical_payload(data)
 
-        payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
-        expected_sig = hmac.new(
-            self._signing_key.encode("utf-8"),
-            payload.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(sig, expected_sig):
-            log.warning("[LICENSE] Invalid license signature -- falling back to free tier")
+        # Ed25519 (asymmetric) is the preferred scheme: the issuer signs with a
+        # private key and the client verifies with an embedded/configured PUBLIC
+        # key, which is safe to distribute (it can only verify, never mint).
+        if sig_alg == "ed25519":
+            if not self._verify_ed25519(payload, sig):
+                log.warning(
+                    "[LICENSE] Ed25519 signature verification failed -- falling back to free tier"
+                )
+                self._license = _FREE_LICENSE
+                return
+        elif sig_alg == "hmac":
+            # FAIL CLOSED: a shared *symmetric* HMAC secret cannot be verified
+            # on the client without also shipping the secret that mints
+            # licenses, so with no signing key configured any blob is
+            # unauthenticated and must be treated as free tier. (Skipping this
+            # check previously let anyone forge an enterprise license by leaving
+            # the key unset.) Prefer Ed25519; HMAC is retained only for legacy
+            # licenses issued before the asymmetric switch.
+            if not self._signing_key:
+                log.warning(
+                    "[LICENSE] No signing key configured -- cannot verify HMAC "
+                    "license signature; falling back to free tier"
+                )
+                self._license = _FREE_LICENSE
+                return
+            expected_sig = hmac.new(
+                self._signing_key.encode("utf-8"),
+                payload.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac.compare_digest(sig, expected_sig):
+                log.warning("[LICENSE] Invalid license signature -- falling back to free tier")
+                self._license = _FREE_LICENSE
+                return
+        else:
+            log.warning(
+                "[LICENSE] Unknown signature algorithm %r -- falling back to free tier",
+                sig_alg,
+            )
             self._license = _FREE_LICENSE
             return
 
@@ -191,6 +270,32 @@ class LicenseManager:
             self._license.org,
             self._license.expires,
         )
+
+    def _verify_ed25519(self, payload: str, sig_b64: str) -> bool:
+        """Verify an Ed25519 license signature. Fails closed on any error."""
+        if not self._public_key:
+            log.warning(
+                "[LICENSE] No Ed25519 public key configured -- cannot verify asymmetric license"
+            )
+            return False
+        try:
+            from cryptography.exceptions import InvalidSignature
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        except ImportError:
+            log.warning(
+                "[LICENSE] 'cryptography' not installed -- cannot verify Ed25519 "
+                "license; install oubliette-trap[licensing]"
+            )
+            return False
+        try:
+            pub = Ed25519PublicKey.from_public_bytes(base64.b64decode(self._public_key))
+            pub.verify(base64.b64decode(sig_b64), payload.encode("utf-8"))
+            return True
+        except InvalidSignature:
+            return False
+        except Exception:  # malformed key/sig, bad base64, etc.
+            log.warning("[LICENSE] Malformed Ed25519 key or signature")
+            return False
 
     @property
     def license(self) -> LicenseInfo:
