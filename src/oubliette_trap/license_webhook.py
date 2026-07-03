@@ -146,8 +146,7 @@ def license_for_sale(
     """
     if not webhook_secret:
         raise ValueError(
-            "webhook_secret is required -- refusing to issue licenses on an "
-            "unauthenticated webhook"
+            "webhook_secret is required -- refusing to issue licenses on an unauthenticated webhook"
         )
 
     if provider == "paddle":
@@ -195,8 +194,8 @@ def create_license_webhook_blueprint(
     webhook_secret: str,
     provider: str = "gumroad",
     seller_id: str | None = None,
-    deliver=None,
-):  # pragma: no cover - thin Flask glue; logic is tested via license_for_sale
+    deliver: Any = None,
+) -> Any:  # pragma: no cover - thin Flask glue; logic is tested via license_for_sale
     """Flask blueprint exposing POST /webhooks/gumroad.
 
     ``webhook_secret`` is mandatory -- it authenticates the merchant ping. For
@@ -213,7 +212,7 @@ def create_license_webhook_blueprint(
     bp = Blueprint("license_webhook", __name__)
 
     @bp.route("/webhooks/gumroad", methods=["POST"])
-    def gumroad():
+    def gumroad() -> Any:
         payload = request.form.to_dict() or (request.get_json(silent=True) or {})
         try:
             result = license_for_sale(

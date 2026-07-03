@@ -30,15 +30,15 @@ log = logging.getLogger(__name__)
 # Features that require Pro tier (Trap deception platform)
 PRO_FEATURES = frozenset(
     {
-        "active_probes",        # active fingerprinting probes (canary, instruction trap)
-        "custom_profiles",      # author/import custom deception profiles
-        "network_transport",    # SSE/network-accessible honeypot (vs local stdio)
-        "stix_export",          # STIX 2.1 intel export
-        "cef_export",           # CEF/SIEM intel export
-        "intel_dashboard",      # captured-agent intel dashboard + aggregation
-        "webhooks",             # capture-event webhook alerts
-        "rbac",                 # role-based access control
-        "tenant_manager",       # multi-tenant isolation
+        "active_probes",  # active fingerprinting probes (canary, instruction trap)
+        "custom_profiles",  # author/import custom deception profiles
+        "network_transport",  # SSE/network-accessible honeypot (vs local stdio)
+        "stix_export",  # STIX 2.1 intel export
+        "cef_export",  # CEF/SIEM intel export
+        "intel_dashboard",  # captured-agent intel dashboard + aggregation
+        "webhooks",  # capture-event webhook alerts
+        "rbac",  # role-based access control
+        "tenant_manager",  # multi-tenant isolation
     }
 )
 

@@ -52,3 +52,17 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F841"]
+
+[tool.mypy]
+# Flask is an optional (api-extra) dependency and ships without mypy stubs;
+# the CI mypy job installs only .[dev], so resolve its imports to Any rather
+# than failing strict on the optional web glue.
+[[tool.mypy.overrides]]
+module = ["flask", "flask.*"]
+ignore_missing_imports = true
+
+# Flask's route decorators resolve to Any (stub-less), which trips
+# --strict's untyped-decorator rule on the thin webhook glue. Allow it.
+[[tool.mypy.overrides]]
+module = ["oubliette_trap.license_webhook"]
+disallow_untyped_decorators = false

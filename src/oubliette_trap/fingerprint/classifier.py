@@ -48,9 +48,7 @@ def classify_agent(
     return AgentClassification(agent_type=best_type, confidence=round(confidence, 2))
 
 
-def _score_llm_agent(
-    signals: PassiveSignals, probes_triggered: int, probes_sent: int
-) -> float:
+def _score_llm_agent(signals: PassiveSignals, probes_triggered: int, probes_sent: int) -> float:
     score = 0.0
     if 100 <= signals.avg_timing_ms <= 2000 and signals.timing_regularity > 0.5:
         score += 2.0
@@ -75,9 +73,7 @@ def _score_llm_agent(
     return score
 
 
-def _score_script(
-    signals: PassiveSignals, probes_triggered: int, probes_sent: int
-) -> float:
+def _score_script(signals: PassiveSignals, probes_triggered: int, probes_sent: int) -> float:
     score = 0.0
     if signals.avg_timing_ms < 50:
         score += 3.0
@@ -94,9 +90,7 @@ def _score_script(
     return score
 
 
-def _score_human(
-    signals: PassiveSignals, probes_triggered: int, probes_sent: int
-) -> float:
+def _score_human(signals: PassiveSignals, probes_triggered: int, probes_sent: int) -> float:
     score = 0.0
     if signals.avg_timing_ms > 2000:
         score += 2.0

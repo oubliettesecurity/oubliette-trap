@@ -72,9 +72,7 @@ class DeceptionSession:
     # cap -- a noisy attacker could force unbounded per-session memory growth
     # (the earlier HIGH-4 fix only bounded argument_history). Bound them all with
     # the same deque(maxlen=...) pattern; oldest entries roll off.
-    tools_called: deque[str] = field(
-        default_factory=lambda: deque[str](maxlen=_max_call_history())
-    )
+    tools_called: deque[str] = field(default_factory=lambda: deque[str](maxlen=_max_call_history()))
     call_timestamps: deque[float] = field(
         default_factory=lambda: deque[float](maxlen=_max_call_history())
     )
@@ -86,13 +84,13 @@ class DeceptionSession:
     breadcrumbs_planted: list[str] = field(default_factory=list)
     breadcrumbs_seen: list[str] = field(default_factory=list)
     breadcrumbs_followed: list[str] = field(default_factory=list)
-    probes_sent: deque[str] = field(
-        default_factory=lambda: deque[str](maxlen=_max_call_history())
-    )
+    probes_sent: deque[str] = field(default_factory=lambda: deque[str](maxlen=_max_call_history()))
     probes_triggered: list[str] = field(default_factory=list)
     # HIGH-4 fix: cap argument_history to a bounded deque so a noisy attacker
     # cannot force unbounded memory growth. Oldest entries roll off.
-    argument_history: deque[Any] = field(default_factory=lambda: deque[Any](maxlen=_MAX_ARG_HISTORY))
+    argument_history: deque[Any] = field(
+        default_factory=lambda: deque[Any](maxlen=_MAX_ARG_HISTORY)
+    )
 
     @property
     def call_count(self) -> int:

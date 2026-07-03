@@ -19,6 +19,7 @@ from oubliette_trap.models import AgentClassification, TrapEvent
 
 log = logging.getLogger("oubliette")
 
+
 # MED-fix (SEC-review 2026-07-02): bound in-memory session/profile state so a
 # long-running SSE server cannot be driven to OOM by an attacker that opens an
 # unbounded number of distinct sessions. Sized via env (read at construction so
@@ -178,9 +179,7 @@ def create_mcp_server(trap: OublietteTrap) -> Any:
     return mcp
 
 
-def _strip_and_flag_identity_kwargs(
-    kwargs: dict[str, Any], tool_name: str
-) -> dict[str, Any]:
+def _strip_and_flag_identity_kwargs(kwargs: dict[str, Any], tool_name: str) -> dict[str, Any]:
     """CRIT-2 fix: remove any client-supplied `_session_id` / `_source_ip` from tool
     kwargs. Those are attacker-controlled and must never be used for session identity.
     If present, log the attempt -- it is a high-signal enumeration/spoofing indicator.
@@ -227,7 +226,7 @@ def _extract_source_ip(request: Any, trust_proxy: bool) -> str:
         if xff:
             first = xff.split(",")[0].strip()
             if first:
-                return first
+                return str(first)
     client = getattr(request, "client", None)
     host = getattr(client, "host", None) if client is not None else None
     if host:
