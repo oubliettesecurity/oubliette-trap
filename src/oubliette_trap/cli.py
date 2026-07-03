@@ -156,8 +156,7 @@ def _export(args: argparse.Namespace) -> None:
             common = ""
         if common != base_dir:
             print(
-                f"refusing to write outside {base_dir!r}; "
-                f"pass --output under the storage dir",
+                f"refusing to write outside {base_dir!r}; pass --output under the storage dir",
                 file=sys.stderr,
             )
             sys.exit(2)

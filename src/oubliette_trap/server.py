@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
+from collections import OrderedDict
 from typing import Any
 
 from oubliette_trap.deception.profile import DeceptionProfile
@@ -16,6 +18,20 @@ from oubliette_trap.intel.events import EventStore
 from oubliette_trap.models import AgentClassification, TrapEvent
 
 log = logging.getLogger("oubliette")
+
+
+# MED-fix (SEC-review 2026-07-02): bound in-memory session/profile state so a
+# long-running SSE server cannot be driven to OOM by an attacker that opens an
+# unbounded number of distinct sessions. Sized via env (read at construction so
+# it is tunable without a module reload), mirroring the OUBLIETTE_MAX_ARG_HISTORY
+# knob in deception/session.py.
+def _max_sessions() -> int:
+    return int(os.getenv("OUBLIETTE_MAX_SESSIONS", "10000"))
+
+
+def _session_idle_ttl() -> int:
+    """Idle sessions older than this (seconds) are evicted lazily on access."""
+    return int(os.getenv("OUBLIETTE_SESSION_TTL_SECONDS", "3600"))
 
 
 class OublietteTrap:
@@ -32,15 +48,45 @@ class OublietteTrap:
         self.event_store = EventStore(db_path=os.path.join(storage_dir, "oubliette.db"))
         self.active_probes = active_probes
         self.probe_injector = ProbeInjector() if active_probes else None
-        self.sessions: dict[str, DeceptionSession] = {}
+        # LRU-ordered stores (most-recently-used at the end). Bounded by
+        # _MAX_SESSIONS with lazy idle-TTL eviction to cap memory (MED-fix).
+        self.sessions: OrderedDict[str, DeceptionSession] = OrderedDict()
         # CRIT-1 fix: per-session DeceptionProfile so every session sees a distinct
         # EnvironmentState. Two sessions can no longer diff identical hostnames/creds
         # to fingerprint the honeypot.
-        self.profiles: dict[str, DeceptionProfile] = {}
+        self.profiles: OrderedDict[str, DeceptionProfile] = OrderedDict()
+        self._max_sessions = _max_sessions()
+        self._session_ttl = _session_idle_ttl()
+        self._session_seen: OrderedDict[str, float] = OrderedDict()
+
+    def _forget_session(self, session_id: str) -> None:
+        self.sessions.pop(session_id, None)
+        self.profiles.pop(session_id, None)
+        self._session_seen.pop(session_id, None)
+
+    def _evict_sessions(self) -> None:
+        """Evict idle-expired sessions, then LRU-trim to the size cap."""
+        if self._session_ttl > 0 and self._session_seen:
+            now = time.monotonic()
+            expired = [
+                sid for sid, seen in self._session_seen.items() if now - seen > self._session_ttl
+            ]
+            for sid in expired:
+                self._forget_session(sid)
+        while len(self.sessions) > self._max_sessions:
+            oldest, _ = next(iter(self.sessions.items()))
+            self._forget_session(oldest)
 
     def _get_session(self, session_id: str, source_ip: str) -> DeceptionSession:
-        if session_id not in self.sessions:
-            self.sessions[session_id] = DeceptionSession(session_id=session_id, source_ip=source_ip)
+        session = self.sessions.get(session_id)
+        if session is None:
+            session = DeceptionSession(session_id=session_id, source_ip=source_ip)
+            self.sessions[session_id] = session
+        else:
+            self.sessions.move_to_end(session_id)
+        self._session_seen[session_id] = time.monotonic()
+        self._session_seen.move_to_end(session_id)
+        self._evict_sessions()
         return self.sessions[session_id]
 
     def _get_profile(self, session_id: str) -> DeceptionProfile:
@@ -133,9 +179,7 @@ def create_mcp_server(trap: OublietteTrap) -> Any:
     return mcp
 
 
-def _strip_and_flag_identity_kwargs(
-    kwargs: dict[str, Any], tool_name: str
-) -> dict[str, Any]:
+def _strip_and_flag_identity_kwargs(kwargs: dict[str, Any], tool_name: str) -> dict[str, Any]:
     """CRIT-2 fix: remove any client-supplied `_session_id` / `_source_ip` from tool
     kwargs. Those are attacker-controlled and must never be used for session identity.
     If present, log the attempt -- it is a high-signal enumeration/spoofing indicator.
@@ -154,14 +198,63 @@ def _strip_and_flag_identity_kwargs(
     return kwargs
 
 
+def _trust_proxy() -> bool:
+    """Whether to honor X-Forwarded-For. Only enable when the honeypot sits
+    behind a proxy/LB you control -- otherwise XFF is attacker-spoofable."""
+    return os.getenv("OUBLIETTE_TRUST_PROXY", "").strip().lower() in ("1", "true", "yes")
+
+
+def _extract_source_ip(request: Any, trust_proxy: bool) -> str:
+    """Extract the peer IP from an ASGI/Starlette request.
+
+    HIGH-fix (SEC-review 2026-07-02): the real MCP tool path left source_ip as
+    "unknown", so every IP-keyed intel path (get_by_source_ip, CEF ``src=``,
+    STIX ipv4-addr) was inert in production. We now read ``request.client.host``.
+
+    X-Forwarded-For is only honored when ``trust_proxy`` is set, because it is
+    attacker-controlled otherwise; we then take the left-most (original client)
+    entry. NOTE: the stdio transport has no request and therefore no meaningful
+    source IP -- it returns "unknown" by design.
+    """
+    if request is None:
+        return "unknown"
+    if trust_proxy:
+        try:
+            xff = request.headers.get("x-forwarded-for")
+        except Exception:  # pragma: no cover -- defensive
+            xff = None
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return str(first)
+    client = getattr(request, "client", None)
+    host = getattr(client, "host", None) if client is not None else None
+    if host:
+        return str(host)
+    return "unknown"
+
+
+def _request_from_ctx(ctx: Any) -> Any:
+    """Best-effort extraction of the Starlette request from a FastMCP Context.
+
+    Networked transports (SSE / streamable-HTTP) expose the ASGI request via
+    ``ctx.request_context.request``; stdio does not, in which case this returns
+    None and the caller falls back to "unknown"."""
+    if ctx is None:
+        return None
+    rc = getattr(ctx, "request_context", None)
+    if rc is None:
+        return None
+    return getattr(rc, "request", None)
+
+
 def _derive_session_identity(ctx: Any) -> tuple[str, str]:
     """Derive (session_id, source_ip) from the MCP transport context rather than
     tool kwargs (CRIT-2). Falls back to stable defaults when the transport does
     not expose the relevant fields (e.g. stdio transport, or tests)."""
     session_id = "default"
-    source_ip = "unknown"
     if ctx is None:
-        return session_id, source_ip
+        return session_id, "unknown"
     # FastMCP Context exposes client_id and request_id. Prefer client_id as the
     # stable per-connection identifier; fall back to request_id.
     try:
@@ -174,9 +267,8 @@ def _derive_session_identity(ctx: Any) -> tuple[str, str]:
                 session_id = str(request_id)
     except Exception:  # pragma: no cover -- defensive
         pass
-    # The peer address is only reliably available for networked transports; in
-    # FastMCP's current API it is not exposed through Context, so we leave it as
-    # "unknown" rather than trust anything from the tool args.
+    # HIGH-fix: populate the real peer address from the transport request.
+    source_ip = _extract_source_ip(_request_from_ctx(ctx), _trust_proxy())
     return session_id, source_ip
 
 

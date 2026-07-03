@@ -30,15 +30,15 @@ log = logging.getLogger(__name__)
 # Features that require Pro tier (Trap deception platform)
 PRO_FEATURES = frozenset(
     {
-        "active_probes",        # active fingerprinting probes (canary, instruction trap)
-        "custom_profiles",      # author/import custom deception profiles
-        "network_transport",    # SSE/network-accessible honeypot (vs local stdio)
-        "stix_export",          # STIX 2.1 intel export
-        "cef_export",           # CEF/SIEM intel export
-        "intel_dashboard",      # captured-agent intel dashboard + aggregation
-        "webhooks",             # capture-event webhook alerts
-        "rbac",                 # role-based access control
-        "tenant_manager",       # multi-tenant isolation
+        "active_probes",  # active fingerprinting probes (canary, instruction trap)
+        "custom_profiles",  # author/import custom deception profiles
+        "network_transport",  # SSE/network-accessible honeypot (vs local stdio)
+        "stix_export",  # STIX 2.1 intel export
+        "cef_export",  # CEF/SIEM intel export
+        "intel_dashboard",  # captured-agent intel dashboard + aggregation
+        "webhooks",  # capture-event webhook alerts
+        "rbac",  # role-based access control
+        "tenant_manager",  # multi-tenant isolation
     }
 )
 
@@ -137,18 +137,28 @@ class LicenseManager:
             return
 
         sig = data.pop("sig", "")
-        # Verify signature if we have a signing key
-        if self._signing_key:
-            payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
-            expected_sig = hmac.new(
-                self._signing_key.encode("utf-8"),
-                payload.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
-            if not hmac.compare_digest(sig, expected_sig):
-                log.warning("[LICENSE] Invalid license signature -- falling back to free tier")
-                self._license = _FREE_LICENSE
-                return
+        # FAIL CLOSED: without a signing key we cannot verify the signature, so
+        # we must not trust the tier the (unsigned) blob claims. An empty
+        # signing key would otherwise let anyone hand-craft an "enterprise"
+        # license. Force free tier instead.
+        if not self._signing_key:
+            log.warning(
+                "[LICENSE] No signing key configured -- cannot verify license; "
+                "falling back to free tier"
+            )
+            self._license = _FREE_LICENSE
+            return
+
+        payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
+        expected_sig = hmac.new(
+            self._signing_key.encode("utf-8"),
+            payload.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            log.warning("[LICENSE] Invalid license signature -- falling back to free tier")
+            self._license = _FREE_LICENSE
+            return
 
         # Check expiry
         expires = data.get("expires", "")

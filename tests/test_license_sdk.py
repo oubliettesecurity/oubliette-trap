@@ -28,9 +28,15 @@ def test_wrong_key_falls_back_to_free():
 
 def test_webhook_issues_validating_key():
     res = license_for_sale(
-        {"product_permalink": "oubliette-trap-pro", "email": "a@b.com", "full_name": "Acme"},
+        {
+            "product_permalink": "oubliette-trap-pro",
+            "email": "a@b.com",
+            "full_name": "Acme",
+            "webhook_token": "hook-secret",
+        },
         {"oubliette-trap-pro": {"tier": "pro"}},
         "trap-secret",
+        webhook_secret="hook-secret",
     )
     assert res is not None and res["tier"] == "pro"
     mgr = LicenseManager(signing_key="trap-secret")

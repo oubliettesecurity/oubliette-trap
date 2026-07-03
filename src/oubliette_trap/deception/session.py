@@ -36,6 +36,13 @@ _MAX_ARG_HISTORY = int(os.getenv("OUBLIETTE_MAX_ARG_HISTORY", "500"))
 _MAX_ARG_BYTES = int(os.getenv("OUBLIETTE_MAX_ARG_BYTES", "16384"))
 
 
+def _max_call_history() -> int:
+    """Cap for the per-call history deques (tools_called, call_timestamps,
+    inter_call_timings_ms, probes_sent). Read at session-construction time so it
+    can be tuned via env without a module reload."""
+    return int(os.getenv("OUBLIETTE_MAX_CALL_HISTORY", "1000"))
+
+
 def _value_appears_as_leaf(target: str, arguments: Any) -> bool:
     """True iff ``target`` appears as a leaf string VALUE in ``arguments``.
 
@@ -61,19 +68,29 @@ class DeceptionSession:
     session_id: str
     source_ip: str
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    tools_called: list[str] = field(default_factory=list)
-    call_timestamps: list[float] = field(default_factory=list)
-    inter_call_timings_ms: list[float] = field(default_factory=list)
+    # MED-fix (SEC-review 2026-07-02): these four grew one entry per call with no
+    # cap -- a noisy attacker could force unbounded per-session memory growth
+    # (the earlier HIGH-4 fix only bounded argument_history). Bound them all with
+    # the same deque(maxlen=...) pattern; oldest entries roll off.
+    tools_called: deque[str] = field(default_factory=lambda: deque[str](maxlen=_max_call_history()))
+    call_timestamps: deque[float] = field(
+        default_factory=lambda: deque[float](maxlen=_max_call_history())
+    )
+    inter_call_timings_ms: deque[float] = field(
+        default_factory=lambda: deque[float](maxlen=_max_call_history())
+    )
     categories_seen: list[str] = field(default_factory=list)
     escalation_depth: int = 0
     breadcrumbs_planted: list[str] = field(default_factory=list)
     breadcrumbs_seen: list[str] = field(default_factory=list)
     breadcrumbs_followed: list[str] = field(default_factory=list)
-    probes_sent: list[str] = field(default_factory=list)
+    probes_sent: deque[str] = field(default_factory=lambda: deque[str](maxlen=_max_call_history()))
     probes_triggered: list[str] = field(default_factory=list)
     # HIGH-4 fix: cap argument_history to a bounded deque so a noisy attacker
     # cannot force unbounded memory growth. Oldest entries roll off.
-    argument_history: deque[Any] = field(default_factory=lambda: deque[Any](maxlen=_MAX_ARG_HISTORY))
+    argument_history: deque[Any] = field(
+        default_factory=lambda: deque[Any](maxlen=_MAX_ARG_HISTORY)
+    )
 
     @property
     def call_count(self) -> int:
@@ -136,7 +153,7 @@ class DeceptionSession:
             "source_ip": self.source_ip,
             "created_at": self.created_at,
             "call_count": self.call_count,
-            "tools_called": self.tools_called,
+            "tools_called": list(self.tools_called),
             "categories_seen": self.categories_seen,
             "escalation_depth": self.escalation_depth,
             "breadcrumbs_planted": len(self.breadcrumbs_planted),

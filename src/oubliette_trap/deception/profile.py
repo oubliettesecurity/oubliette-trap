@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
-
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 _HOSTNAME_PREFIXES = ["web", "api", "db", "cache", "auth", "log", "ci", "queue", "store", "mon"]
 _HOSTNAME_SUFFIXES = ["prod", "staging", "int", "001", "002", "east", "west"]

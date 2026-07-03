@@ -20,7 +20,7 @@ import hashlib
 import hmac
 import json
 import os
-from typing import Sequence
+from collections.abc import Sequence
 
 from .license import PRO_FEATURES
 
@@ -69,9 +69,7 @@ def issue_license(
 
     # Sign the EXACT serialization the validator reconstructs (sorted + compact).
     payload = json.dumps(data, sort_keys=True, separators=(",", ":"))
-    sig = hmac.new(
-        signing_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
+    sig = hmac.new(signing_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
     full = dict(data)
     full["sig"] = sig
