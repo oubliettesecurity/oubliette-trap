@@ -55,7 +55,7 @@ _VALIDATION_CACHE_TTL = 3600  # 1 hour
 # ``OUBLIETTE_LICENSE_PUBLIC_KEY`` env var — before publishing. Distributing the
 # public key is safe; it can only verify, never mint. An empty/unset public key
 # means Ed25519 licenses cannot be verified and fail closed to the free tier.
-_BUNDLED_PUBLIC_KEY = ""
+_BUNDLED_PUBLIC_KEY = "Unm7yP9qaz6wHIGKiVKq8z5rQL05lEplzUZx2D1lMOE="
 
 
 def _canonical_payload(data: dict[str, Any]) -> str:
