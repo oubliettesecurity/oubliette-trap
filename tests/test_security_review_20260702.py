@@ -17,7 +17,7 @@ import time
 import pytest
 
 from oubliette_trap.license import LicenseManager
-from oubliette_trap.license_issuer import issue_license
+from oubliette_trap.license_issuer import generate_keypair, issue_license
 from oubliette_trap.license_webhook import license_for_sale
 
 _PMAP = {"oubliette-trap-pro": {"tier": "pro"}}
@@ -53,7 +53,11 @@ def test_webhook_rejects_wrong_token():
         )
 
 
-def test_webhook_issues_with_valid_token():
+def test_webhook_issues_with_valid_token(monkeypatch):
+    # Ed25519 configured: the sale path refuses to mint a licence a standard
+    # install could not verify, so this exercises the supported production path.
+    priv, pub = generate_keypair()
+    monkeypatch.setenv("OUBLIETTE_LICENSE_PRIVATE_KEY", priv)
     res = license_for_sale(
         {
             "product_permalink": "oubliette-trap-pro",
@@ -66,7 +70,7 @@ def test_webhook_issues_with_valid_token():
         webhook_secret="shared",
     )
     assert res is not None and res["tier"] == "pro"
-    mgr = LicenseManager(signing_key="sign")
+    mgr = LicenseManager(public_key=pub)  # what a customer actually holds
     mgr._load_license(res["license_key"])
     assert mgr.license.tier == "pro"
 
@@ -106,7 +110,11 @@ def test_webhook_paddle_signature_rejected():
 
 
 def test_no_signing_key_forces_free_tier():
-    key = issue_license(org="Acme", tier="pro", signing_key="secret")
+    # allow_hmac: this test deliberately produces the unverifiable case it then
+    # asserts is refused. The issuer now blocks that combination by default.
+    key = issue_license(
+        org="Acme", tier="pro", signing_key="secret", allow_hmac=True
+    )
     mgr = LicenseManager(signing_key="")  # server misconfigured / no key
     mgr._load_license(key)
     assert mgr.license.tier == "free", "unsigned/unverifiable license must not grant Pro"

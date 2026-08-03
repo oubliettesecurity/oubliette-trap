@@ -35,6 +35,7 @@ def issue_license(
     issued: str | None = None,
     signing_key: str | None = None,
     private_key: str | None = None,
+    allow_hmac: bool = False,
 ) -> str:
     """Mint a base64 license key validated by ``LicenseManager``.
 
@@ -51,6 +52,8 @@ def issue_license(
         private_key: Ed25519 private key (base64); falls back to
             ``OUBLIETTE_LICENSE_PRIVATE_KEY``. Preferred asymmetric scheme.
             Either a private_key or a signing_key is required.
+        allow_hmac: Opt in to the legacy symmetric scheme. Off by default --
+            see the guard below.
 
     Returns:
         A base64-encoded, signed license key string.
@@ -63,6 +66,20 @@ def issue_license(
         raise ValueError(
             "an Ed25519 private_key (preferred) or an HMAC signing_key is "
             "required to issue a license"
+        )
+    # A symmetric signature cannot be verified by a standard install: doing so
+    # would require shipping the secret that mints licenses, so LicenseManager
+    # correctly falls back to the free tier instead. Minting one anyway means a
+    # completed sale delivers a key that grants nothing, with no error anywhere
+    # in the flow. Refuse by default; allow_hmac is for clients that already
+    # hold the key (legacy licences predating the asymmetric switch).
+    if not private_key and not allow_hmac:
+        raise ValueError(
+            "refusing to issue: no Ed25519 private key configured (pass "
+            "private_key= or set OUBLIETTE_LICENSE_PRIVATE_KEY). A symmetric "
+            "license cannot be verified by a standard install and would leave "
+            "the customer on the free tier. Pass allow_hmac=True only for "
+            "clients that already hold the signing key."
         )
 
     if features is None:
