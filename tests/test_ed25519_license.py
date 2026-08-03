@@ -71,7 +71,9 @@ def test_forged_unsigned_enterprise_blob_still_rejected():
 
 
 def test_legacy_hmac_still_supported():
-    key = issue_license(org="Acme", tier="pro", signing_key="s3cret")
+    # Opt-in required now that the issuer refuses symmetric licences by
+    # default. This client holds the key, so it verifies.
+    key = issue_license(org="Acme", tier="pro", signing_key="s3cret", allow_hmac=True)
     assert json.loads(base64.b64decode(key))["sig_alg"] == "hmac"
     mgr = LicenseManager(signing_key="s3cret")
     mgr._load_license(key)
