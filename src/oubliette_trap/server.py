@@ -9,6 +9,14 @@ import time
 from collections import OrderedDict
 from typing import Any
 
+# Imported at module scope, not inside _register_tool: `from __future__ import
+# annotations` defers the tool handler's annotations to strings, and fastmcp
+# evaluates them against this module's globals. A function-local import leaves
+# `Context` unresolvable there, which Python 3.14's annotation handling surfaces
+# as InvalidSignature when the server is built. mcp is a hard dependency, so a
+# module-level import costs nothing that was not already required.
+from mcp.server.fastmcp import Context
+
 from oubliette_trap.deception.profile import DeceptionProfile
 from oubliette_trap.deception.session import DeceptionSession
 from oubliette_trap.fingerprint.classifier import classify_agent
@@ -273,8 +281,6 @@ def _derive_session_identity(ctx: Any) -> tuple[str, str]:
 
 
 def _register_tool(mcp: Any, trap: OublietteTrap, tool_name: str) -> None:
-    from mcp.server.fastmcp import Context
-
     descriptions = {
         "list_services": "List all running services in the environment",
         "get_environment": "Get environment configuration and network details",

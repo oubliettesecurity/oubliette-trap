@@ -59,3 +59,17 @@ def test_the_import_the_cap_protects_still_exists():
     from mcp.server.fastmcp import FastMCP
 
     assert FastMCP is not None
+
+
+def test_the_server_entry_point_can_actually_be_built():
+    """The end a customer cares about: the honeypot server constructs.
+
+    Covers more than the version cap. `create_mcp_server` also broke on Python
+    3.14 with a permitted mcp, because the tool handler's deferred annotations
+    referenced a `Context` imported inside a function and so absent from the
+    module globals fastmcp evaluates against. A cap alone would not have caught
+    that -- only building the thing does.
+    """
+    from oubliette_trap.server import OublietteTrap, create_mcp_server
+
+    assert create_mcp_server(OublietteTrap()) is not None
