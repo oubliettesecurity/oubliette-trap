@@ -190,29 +190,36 @@ class UsageTracker:
         """
         if quantity < 0:
             raise ValueError(f"quantity must be >= 0, got {quantity!r}")
-        month = self._month_key()
-        summary = self._get_or_create_summary(month)
+        # Reads shared summary state, so it takes ``self._lock``.
+        # ``_get_or_create_summary`` documents that its caller must hold the
+        # lock; this path did not, so a concurrent ``record`` could mutate the
+        # summaries mapping mid-read. ``_lock`` is an RLock, so ``record``
+        # calling this while already holding it is fine.
+        with self._lock:
+            month = self._month_key()
+            summary = self._get_or_create_summary(month)
 
-        quota_map = {
-            "api_call": ("api_calls", summary.api_calls),
-            "input_token": ("tokens", summary.input_tokens + summary.output_tokens),
-            "output_token": ("tokens", summary.input_tokens + summary.output_tokens),
-            "detection": ("api_calls", summary.api_calls),
-            "export": ("exports", summary.exports),
-        }
+            quota_map = {
+                "api_call": ("api_calls", summary.api_calls),
+                "input_token": ("tokens", summary.input_tokens + summary.output_tokens),
+                "output_token": ("tokens", summary.input_tokens + summary.output_tokens),
+                "detection": ("api_calls", summary.api_calls),
+                "export": ("exports", summary.exports),
+            }
 
-        quota_type, current = quota_map.get(event_type, ("api_calls", 0))
-        limit = self._get_quota(quota_type)
+            quota_type, current = quota_map.get(event_type, ("api_calls", 0))
+            limit = self._get_quota(quota_type)
 
-        if limit > 0 and current + quantity > limit:
-            msg = (
-                f"Quota exceeded: {quota_type} {current + quantity}/{limit} for tier '{self.tier}'"
-            )
-            if self.hard_enforce:
-                raise QuotaExceeded(msg)
-            log.warning("[METERING] %s", msg)
-            return False
-        return True
+            if limit > 0 and current + quantity > limit:
+                msg = (
+                    f"Quota exceeded: {quota_type} {current + quantity}/{limit} "
+                    f"for tier '{self.tier}'"
+                )
+                if self.hard_enforce:
+                    raise QuotaExceeded(msg)
+                log.warning("[METERING] %s", msg)
+                return False
+            return True
 
     # ------------------------------------------------------------------
     # Recording usage
@@ -249,20 +256,27 @@ class UsageTracker:
         """
         if quantity < 0:
             raise ValueError(f"quantity must be >= 0, got {quantity!r}")
-        within_quota = self.check_quota(event_type, quantity)
-
-        event = UsageEvent(
-            timestamp=datetime.now(UTC).isoformat(),
-            event_type=event_type,
-            feature=feature,
-            quantity=quantity,
-            org_id=self.org_id,
-            api_key_hash=api_key_hash,
-            metadata=metadata or {},
-            over_quota=not within_quota,
-        )
 
         with self._lock:
+            # Atomic check-and-increment: hold the lock across the quota check
+            # AND the counter update, so a concurrent record() cannot slip a
+            # second increment past the boundary. Checking outside the lock let
+            # two callers both pass a check that only one of them should have.
+            # On hard_enforce, check_quota raises QuotaExceeded here and no
+            # counters are mutated.
+            within_quota = self.check_quota(event_type, quantity)
+
+            event = UsageEvent(
+                timestamp=datetime.now(UTC).isoformat(),
+                event_type=event_type,
+                feature=feature,
+                quantity=quantity,
+                org_id=self.org_id,
+                api_key_hash=api_key_hash,
+                metadata=metadata or {},
+                over_quota=not within_quota,
+            )
+
             month = self._month_key()
             summary = self._get_or_create_summary(month)
 

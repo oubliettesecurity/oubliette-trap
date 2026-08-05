@@ -17,7 +17,7 @@ from typing import Any
 
 @dataclass
 class Tenant:
-    """Represents a tenant in the multi-tenant Shield deployment."""
+    """Represents a tenant in the multi-tenant Trap deployment."""
 
     tenant_id: str
     name: str
