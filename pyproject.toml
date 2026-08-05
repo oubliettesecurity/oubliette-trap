@@ -17,7 +17,12 @@ keywords = [
     "fingerprinting", "threat-intelligence", "llm", "red-team",
 ]
 dependencies = [
-    "mcp>=1.20.0",
+    # Capped below 2.0: mcp 2.0.0 removed ``mcp.server.fastmcp``, which
+    # server.create_mcp_server imports -- the honeypot's primary entry point.
+    # Uncapped, a fresh install resolves 2.x and that function raises
+    # ModuleNotFoundError. See tests/test_mcp_version_contract.py before
+    # lifting this; the port is separate work.
+    "mcp>=1.20.0,<2",
 ]
 
 [project.optional-dependencies]
