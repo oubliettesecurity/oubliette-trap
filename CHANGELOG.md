@@ -22,6 +22,8 @@ upload dates (UTC). There was no 0.1.0 release on PyPI; 0.2.0 was the first.
 ### Fixed
 - `oubliette_trap.__version__` now matches the package version (0.3.1). The
   published 0.3.1 reports `0.3.0`, and 0.2.0 reports `0.1.0`.
+- CEF export: the header's Device Version field now carries the package
+  version instead of a hardcoded `0.1.0`.
 
 ## [0.3.1] - 2026-08-05
 

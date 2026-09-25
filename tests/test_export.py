@@ -1,6 +1,7 @@
 """Tests for intelligence export (STIX, CEF, JSON)."""
 import json
 import pytest
+from oubliette_trap import __version__
 from oubliette_trap.intel.export import export_stix, export_cef, export_json
 from oubliette_trap.models import TrapEvent, AgentClassification, AgentType, AgentProfile
 
@@ -55,6 +56,12 @@ class TestCefExport:
     def test_includes_tool_name(self, sample_events):
         lines = export_cef(sample_events)
         assert "list_services" in lines[0]
+
+    def test_header_device_version_is_package_version(self, sample_events):
+        # CEF header: CEF:Version|Device Vendor|Device Product|Device Version|...
+        for line in export_cef(sample_events):
+            fields = line.split("|")
+            assert fields[:4] == ["CEF:0", "Oubliette", "Trap", __version__]
 
 
 class TestJsonExport:

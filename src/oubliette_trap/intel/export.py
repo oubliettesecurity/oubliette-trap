@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from oubliette_trap import __version__
 from oubliette_trap.models import AgentProfile, TrapEvent
 
 
@@ -122,7 +123,11 @@ def export_cef(events: list[TrapEvent]) -> list[str]:
             f"cs3={_cef_escape_ext(event.deception_profile)} cs3Label=Profile "
             f"msg={_cef_escape_ext(event.tool_name)}"
         )
-        line = f"CEF:0|Oubliette|Trap|0.1.0|{_cef_escape_header(event.tool_name)}|{name}|{severity}|{ext}"
+        # Device Version (header field 4) is the installed package version.
+        line = (
+            f"CEF:0|Oubliette|Trap|{__version__}|"
+            f"{_cef_escape_header(event.tool_name)}|{name}|{severity}|{ext}"
+        )
         lines.append(line)
     return lines
 
