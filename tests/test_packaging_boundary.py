@@ -116,10 +116,8 @@ def test_sdist_contains_only_expected_files() -> None:
         bad = []
         for name in members:
             _, _, rel = name.partition("/")  # strip "<name>-<version>/"
-            ok = (
-                rel in SDIST_ALLOWED_TOP
-                or rel.startswith(f"src/{PACKAGE}/")
-                or rel.startswith(f"src/{DIST}.egg-info/")
+            ok = rel in SDIST_ALLOWED_TOP or rel.startswith(
+                (f"src/{PACKAGE}/", f"src/{DIST}.egg-info/")
             )
             if not ok:
                 bad.append(name)
