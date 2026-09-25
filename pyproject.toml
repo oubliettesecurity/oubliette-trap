@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,7 @@ version = "0.3.1"
 description = "AI Agent Deception Platform -- honeypots, fingerprinting, and intelligence for autonomous AI threats"
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
     { name = "Oubliette Security" },
@@ -31,7 +32,13 @@ api = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 licensing = ["cryptography>=48.0.1"]
 dev = ["pytest>=8.0", "pytest-asyncio>=1.0", "cryptography>=48.0.1"]
 # Clean-machine test environment: `uv pip install -e ".[test]" && pytest` -> green.
-test = ["oubliette-trap[dev]"]
+test = [
+    "oubliette-trap[dev]",
+    # tests/test_packaging_boundary.py resolves the package list with
+    # setuptools; uv venvs do not ship it, and a silently skipped boundary
+    # guard is exactly the failure mode that test exists to prevent.
+    "setuptools>=77.0",
+]
 
 [project.scripts]
 oubliette-trap = "oubliette_trap.cli:main"
