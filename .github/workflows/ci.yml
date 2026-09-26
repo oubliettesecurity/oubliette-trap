@@ -13,8 +13,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install ruff
@@ -27,8 +27,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install
@@ -44,8 +44,8 @@ jobs:
     # ruff violation does.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install mypy + runtime deps
@@ -55,3 +55,22 @@ jobs:
           pip install -e ".[dev]"
       - name: mypy --strict on src/oubliette_trap/
         run: python -m mypy --strict --follow-imports=silent src/oubliette_trap/
+
+  build:
+    # Same allowlist gate the publish workflow runs before uploading.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Build sdist and wheel
+        run: |
+          pip install build
+          python -m build
+      - name: Packaging boundary check
+        env:
+          TRAP_REQUIRE_DIST: "1"
+        run: |
+          pip install pytest "setuptools>=77.0"
+          python -m pytest -q --noconftest tests/test_packaging_boundary.py
