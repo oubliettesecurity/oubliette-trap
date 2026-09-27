@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oubliette-trap"
-version = "0.3.2"
+version = "0.4.0"
 description = "AI Agent Deception Platform -- honeypots, fingerprinting, and intelligence for autonomous AI threats"
 readme = "README.md"
 license = "Apache-2.0"
@@ -74,9 +74,3 @@ ignore = [
 [[tool.mypy.overrides]]
 module = ["flask", "flask.*"]
 ignore_missing_imports = true
-
-# Flask's route decorators resolve to Any (stub-less), which trips
-# --strict's untyped-decorator rule on the thin webhook glue. Allow it.
-[[tool.mypy.overrides]]
-module = ["oubliette_trap.license_webhook"]
-disallow_untyped_decorators = false

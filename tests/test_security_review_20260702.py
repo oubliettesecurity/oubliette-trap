@@ -2,6 +2,8 @@
 
 Covers:
   1. [CRITICAL] webhook forges licenses without verification
+     (the webhook moved to oubliette-commerce with product-scoped licensing;
+     its regression tests live there now)
   2. [VERIFY]   license fails OPEN when no signing key configured
   3. [HIGH]     source_ip hardcoded "unknown" in the real MCP path
   4. [MEDIUM]   unbounded sessions/profiles dicts
@@ -10,112 +12,29 @@ Covers:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
-import time
+import json
 
 import pytest
 
 from oubliette_trap.license import LicenseManager
-from oubliette_trap.license_issuer import generate_keypair, issue_license
-from oubliette_trap.license_webhook import license_for_sale
-
-_PMAP = {"oubliette-trap-pro": {"tier": "pro"}}
-
-
-# ---------------------------------------------------------------------------
-# 1. [CRITICAL] webhook must verify before issuing a signed license
-# ---------------------------------------------------------------------------
-
-
-def test_webhook_rejects_unverified_gumroad():
-    """No token at all -> reject. Anyone POSTing a permalink must NOT get a key."""
-    with pytest.raises(PermissionError):
-        license_for_sale(
-            {"product_permalink": "oubliette-trap-pro", "email": "a@b.com"},
-            _PMAP,
-            "sign",
-            webhook_secret="shared",
-        )
-
-
-def test_webhook_rejects_wrong_token():
-    with pytest.raises(PermissionError):
-        license_for_sale(
-            {
-                "product_permalink": "oubliette-trap-pro",
-                "email": "a@b.com",
-                "webhook_token": "not-the-secret",
-            },
-            _PMAP,
-            "sign",
-            webhook_secret="shared",
-        )
-
-
-def test_webhook_issues_with_valid_token(monkeypatch):
-    # Ed25519 configured: the sale path refuses to mint a licence a standard
-    # install could not verify, so this exercises the supported production path.
-    priv, pub = generate_keypair()
-    monkeypatch.setenv("OUBLIETTE_LICENSE_PRIVATE_KEY", priv)
-    res = license_for_sale(
-        {
-            "product_permalink": "oubliette-trap-pro",
-            "email": "a@b.com",
-            "full_name": "Acme",
-            "webhook_token": "shared",
-        },
-        _PMAP,
-        "sign",
-        webhook_secret="shared",
-    )
-    assert res is not None and res["tier"] == "pro"
-    mgr = LicenseManager(public_key=pub)  # what a customer actually holds
-    mgr._load_license(res["license_key"])
-    assert mgr.license.tier == "pro"
-
-
-def test_webhook_requires_configured_secret():
-    """An empty shared secret must fail closed, not skip verification."""
-    with pytest.raises(ValueError):
-        license_for_sale(
-            {"product_permalink": "oubliette-trap-pro", "webhook_token": "x"},
-            _PMAP,
-            "sign",
-            webhook_secret="",
-        )
-
-
-def test_webhook_paddle_signature_accepted():
-    from oubliette_trap.license_webhook import verify_paddle_signature
-
-    secret = "paddle-sec"
-    raw = b"whatever=1"
-    ts = str(int(time.time()))
-    h1 = hmac.new(secret.encode(), f"{ts}:".encode() + raw, hashlib.sha256).hexdigest()
-    headers = {"Paddle-Signature": f"ts={ts};h1={h1}"}
-    assert verify_paddle_signature(raw, headers, secret) is True
-
-
-def test_webhook_paddle_signature_rejected():
-    from oubliette_trap.license_webhook import verify_paddle_signature
-
-    headers = {"Paddle-Signature": "ts=123;h1=deadbeef"}
-    assert verify_paddle_signature(b"x", headers, "paddle-sec") is False
-
 
 # ---------------------------------------------------------------------------
 # 2. [VERIFY] license must fail CLOSED when no signing key is configured
 # ---------------------------------------------------------------------------
 
 
-def test_no_signing_key_forces_free_tier():
-    # allow_hmac: this test deliberately produces the unverifiable case it then
-    # asserts is refused. The issuer now blocks that combination by default.
-    key = issue_license(
-        org="Acme", tier="pro", signing_key="secret", allow_hmac=True
-    )
-    mgr = LicenseManager(signing_key="")  # server misconfigured / no key
+def test_no_signing_key_forces_free_tier(monkeypatch):
+    """A legacy HMAC-signed license must not grant Pro, even when the old
+    signing-key variable is set: schema v2 has no HMAC path at all."""
+    body = {"tier": "pro", "org": "Acme", "features": []}
+    payload = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    sig = hmac.new(b"secret", payload.encode(), hashlib.sha256).hexdigest()
+    key = base64.b64encode(json.dumps({**body, "sig": sig}).encode()).decode()
+    monkeypatch.setenv("OUBLIETTE_LICENSE_SIGNING_KEY", "secret")
+    mgr = LicenseManager()
     mgr._load_license(key)
     assert mgr.license.tier == "free", "unsigned/unverifiable license must not grant Pro"
 
