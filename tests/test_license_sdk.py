@@ -1,20 +1,48 @@
-"""Verify the ported revenue SDK works in Trap (issuer -> validator round-trip)."""
+"""Trap's license SDK: Trap-specific Pro features and a signed round trip.
 
-from oubliette_trap.license import LicenseManager, PRO_FEATURES
-from oubliette_trap.license_issuer import generate_keypair, issue_license
-from oubliette_trap.license_webhook import license_for_sale
+Issuing (and the Gumroad/Paddle sale webhook) lives only in
+oubliette-commerce; these tests sign schema-v2 keys locally with a throwaway
+Ed25519 key.
+"""
+
+from __future__ import annotations
+
+import base64
+import datetime
+import json
+
+import pytest
+
+pytest.importorskip("cryptography")
+
+from oubliette_trap._license_core import canonical_payload, generate_keypair
+from oubliette_trap.license import PRO_FEATURES, LicenseManager
+
+FAR_FUTURE = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
+
+
+def _issue(priv: str, **overrides: object) -> str:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    claims: dict[str, object] = {
+        "v": 2, "kid": "test", "lid": "l1", "products": ["trap"], "tier": "pro",
+        "org": "Acme Corp", "issued": "2026-01-01", "expires": FAR_FUTURE, "quota": 0,
+        "features": ["active_probes"], "sig_alg": "ed25519",
+    }  # fmt: skip
+    claims.update(overrides)
+    signer = Ed25519PrivateKey.from_private_bytes(base64.b64decode(priv))
+    claims["sig"] = base64.b64encode(signer.sign(canonical_payload(claims))).decode()
+    return base64.b64encode(json.dumps(claims).encode()).decode()
 
 
 def test_issued_pro_key_validates():
-    # Legacy symmetric scheme, opted into explicitly: this client holds the
-    # signing key, which is the only situation where such a licence verifies.
-    key = issue_license(
-        org="Acme Corp", tier="pro", signing_key="trap-secret", allow_hmac=True
-    )
-    mgr = LicenseManager(signing_key="trap-secret")
-    mgr._load_license(key)
+    priv, pub = generate_keypair()
+    mgr = LicenseManager(keyring={"test": pub})
+    mgr._load_license(_issue(priv))
     assert mgr.license.tier == "pro"
     assert mgr.license.org == "Acme Corp"
+    assert mgr.check_feature("active_probes") is True
+    assert mgr.check_feature("intel_dashboard") is False
 
 
 def test_pro_features_are_trap_specific():
@@ -24,33 +52,15 @@ def test_pro_features_are_trap_specific():
 
 
 def test_wrong_key_falls_back_to_free():
-    key = issue_license(org="Acme", tier="pro", signing_key="right", allow_hmac=True)
-    mgr = LicenseManager(signing_key="wrong")
-    mgr._load_license(key)
+    priv, _ = generate_keypair()
+    _, other_pub = generate_keypair()
+    mgr = LicenseManager(keyring={"test": other_pub})
+    mgr._load_license(_issue(priv))
     assert mgr.license.tier == "free"
 
 
-def test_webhook_issues_validating_key(monkeypatch):
-    """The sale path must issue a licence a standard install can verify.
-
-    Configured with Ed25519 rather than a symmetric key: the customer receiving
-    this key has only the public half, so an HMAC-signed licence would load as
-    free tier and the sale would silently deliver nothing.
-    """
+def test_shield_key_falls_back_to_free():
     priv, pub = generate_keypair()
-    monkeypatch.setenv("OUBLIETTE_LICENSE_PRIVATE_KEY", priv)
-    res = license_for_sale(
-        {
-            "product_permalink": "oubliette-trap-pro",
-            "email": "a@b.com",
-            "full_name": "Acme",
-            "webhook_token": "hook-secret",
-        },
-        {"oubliette-trap-pro": {"tier": "pro"}},
-        "trap-secret",
-        webhook_secret="hook-secret",
-    )
-    assert res is not None and res["tier"] == "pro"
-    mgr = LicenseManager(public_key=pub)  # what a customer actually has
-    mgr._load_license(res["license_key"])
-    assert mgr.license.tier == "pro"
+    mgr = LicenseManager(keyring={"test": pub})
+    mgr._load_license(_issue(priv, products=["shield"], tier="enterprise"))
+    assert mgr.license.tier == "free"

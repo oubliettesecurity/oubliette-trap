@@ -1,7 +1,9 @@
 """Fail-closed regression tests for license expiry parsing and FeatureGate.
 
 - A correctly signed license whose ``expires`` cannot be parsed must fall back
-  to the free tier (it was previously treated as never expiring).
+  to the free tier (it was previously treated as never expiring). Since schema
+  v2, an empty or missing ``expires`` also gives the free tier: there are no
+  perpetual keys.
 - ``FeatureGate`` without a ``LicenseManager`` cannot verify a key, so it must
   stay at ``community`` unless the explicit dev/test opt-in is enabled.
 """
@@ -14,11 +16,13 @@ import json
 
 import pytest
 
-from oubliette_trap.license import FeatureGate, LicenseManager, _canonical_payload, generate_keypair
+from oubliette_trap._license_core import canonical_payload, generate_keypair
+from oubliette_trap.license import FeatureGate, LicenseManager
 
 pytest.importorskip("cryptography")
 
 PRO_FEATURE = sorted(FeatureGate.PRO_FEATURES)[0]
+FAR_FUTURE = (datetime.date.today() + datetime.timedelta(days=365)).isoformat()
 
 
 @pytest.fixture(autouse=True)
@@ -42,23 +46,26 @@ def _signed(priv_b64: str, **overrides) -> str:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     body = {
+        "v": 2,
+        "kid": "test-2026",
+        "lid": "lid-0001",
+        "products": ["trap"],
         "tier": "enterprise",
         "org": "Acme",
         "issued": "2026-01-01",
-        "expires": "",
+        "expires": FAR_FUTURE,
         "quota": 0,
         "features": [],
+        "sig_alg": "ed25519",
     }
     body.update(overrides)
     priv = Ed25519PrivateKey.from_private_bytes(base64.b64decode(priv_b64))
-    sig = base64.b64encode(priv.sign(_canonical_payload(body).encode("utf-8"))).decode()
-    return base64.b64encode(
-        json.dumps({**body, "sig_alg": "ed25519", "sig": sig}).encode()
-    ).decode()
+    body["sig"] = base64.b64encode(priv.sign(canonical_payload(body))).decode()
+    return base64.b64encode(json.dumps(body).encode()).decode()
 
 
 def _load(pub: str, token: str) -> LicenseManager:
-    mgr = LicenseManager(public_key=pub)
+    mgr = LicenseManager(keyring={"test-2026": pub})
     mgr._load_license(token)
     return mgr
 
@@ -72,9 +79,10 @@ def test_future_expiry_is_accepted(keypair):
     assert _load(pub, _signed(priv, expires=future)).license.tier == "enterprise"
 
 
-def test_empty_expiry_is_perpetual(keypair):
+def test_empty_expiry_fails_closed(keypair):
+    """No perpetual keys in schema v2: an empty expiry is rejected."""
     priv, pub = keypair
-    assert _load(pub, _signed(priv, expires="")).license.tier == "enterprise"
+    assert _load(pub, _signed(priv, expires="")).license.tier == "free"
 
 
 def test_past_expiry_is_rejected(keypair):
