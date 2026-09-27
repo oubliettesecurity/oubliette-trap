@@ -9,21 +9,34 @@ upload dates (UTC). There was no 0.1.0 release on PyPI; 0.2.0 was the first.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-27
+
+### Security
+- **License expiry fails closed.** A signed license whose `expires` value
+  cannot be parsed as an ISO date (or is not a string) now falls back to the
+  free tier. Previously the parse error was swallowed and the license was
+  treated as never expiring (#10).
+- **`FeatureGate` without a `LicenseManager` fails closed.** It cannot verify a
+  key, so any non-empty `OUBLIETTE_LICENSE_KEY` no longer grants Pro; the gate
+  stays at `community`. The old behaviour is available for local development
+  and tests only via `FeatureGate(..., insecure_simple_mode=True)` or
+  `OUBLIETTE_INSECURE_DEV_FEATURE_GATE=true` (default off) (#10).
+
 ### Added
 - `.github/workflows/publish.yml`: publishes `vX.Y.Z` tags to PyPI via Trusted
   Publishing (OIDC), after checking the tag matches the pyproject version and
-  running a packaging-boundary gate on the built sdist and wheel.
-- `tests/test_packaging_boundary.py` and `tests/test_version_sync.py`.
+  running a packaging-boundary gate on the built sdist and wheel (#9).
+- `tests/test_packaging_boundary.py` and `tests/test_version_sync.py` (#9).
 
 ### Changed
-- The sdist no longer includes `tests/` (`MANIFEST.in`).
-- GitHub Actions updated to their Node 24 majors.
+- The sdist no longer includes `tests/` (`MANIFEST.in`) (#9).
+- GitHub Actions updated to their Node 24 majors (#9).
 
 ### Fixed
-- `oubliette_trap.__version__` now matches the package version (0.3.1). The
-  published 0.3.1 reports `0.3.0`, and 0.2.0 reports `0.1.0`.
+- `oubliette_trap.__version__` now matches the package version. The published
+  0.3.1 reports `0.3.0`, and 0.2.0 reports `0.1.0` (#9).
 - CEF export: the header's Device Version field now carries the package
-  version instead of a hardcoded `0.1.0`.
+  version instead of a hardcoded `0.1.0` (#9).
 
 ## [0.3.1] - 2026-08-05
 
@@ -66,7 +79,8 @@ First release on PyPI.
   rotation, resource bounds, SSE bind address, CEF escaping, STIX references
   and export path scope hardened before the first release.
 
-[Unreleased]: https://github.com/oubliettesecurity/oubliette-trap/compare/651e3dd...HEAD
+[Unreleased]: https://github.com/oubliettesecurity/oubliette-trap/compare/v0.3.2...HEAD
+[0.3.2]: https://pypi.org/project/oubliette-trap/0.3.2/
 [0.3.1]: https://pypi.org/project/oubliette-trap/0.3.1/
 [0.3.0]: https://pypi.org/project/oubliette-trap/0.3.0/
 [0.2.0]: https://pypi.org/project/oubliette-trap/0.2.0/
