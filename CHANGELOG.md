@@ -16,6 +16,12 @@ product-scoped Ed25519 keys (schema v2), which is a breaking change: see
 *Changed* and *Removed*.
 
 ### Security
+- **New production license-signing key.** The embedded keyring
+  (`PRODUCTION_KEYRING`) now trusts only kid `oubliette-2026-10`, generated
+  2026-10-06. Kid `oubliette-2026-07` is removed outright: no license was ever
+  issued under it, so no customer key is affected, and a token naming it now
+  gives the free tier. `_license_core.py` stays byte-identical across Commerce,
+  Shield, Trap and Dungeon.
 - **License expiry fails closed.** A signed license whose `expires` value
   cannot be parsed as an ISO date (or is not a string) now falls back to the
   free tier. Previously the parse error was swallowed and the license was
